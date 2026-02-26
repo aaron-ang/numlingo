@@ -22,7 +22,7 @@
   "homepage": "https://github.com/colyseus/create-colyseus#readme",
   "devDependencies": {
     "@colyseus/loadtest": "^0.15.2",
-    "@colyseus/testing": "^0.15.3",
+    "@colyseus/testing": "^0.17.11",
     "@types/express": "^4.17.21",
     "@types/mocha": "^10.0.6",
     "mocha": "^10.8.2",
@@ -32,9 +32,9 @@
   },
   "dependencies": {
     "@colyseus/monitor": "^0.15.6",
-    "@colyseus/playground": "^0.15.12",
-    "@colyseus/tools": "^0.15.36",
-    "colyseus": "^0.15.15",
+    "@colyseus/playground": "^0.17.10",
+    "@colyseus/tools": "^0.17.19",
+    "colyseus": "^0.17.8",
     "express": "^4.21.2"
   }
 }
