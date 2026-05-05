@@ -1,8 +1,10 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Results from "@/components/Results";
-import Game from "@/components/Game";
 import { useAppStore } from "@/utils/store";
+
+const Game = dynamic(() => import("@/components/Game"), { ssr: false });
 
 const Home = () => {
   const { isCompleted } = useAppStore();
