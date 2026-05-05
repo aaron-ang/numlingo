@@ -154,6 +154,7 @@ const Game = () => {
     });
 
     room.onDrop(() => {
+      if (cleanExitRef.current) return;
       toast.info("Connection lost. Reconnecting…");
     });
 
