@@ -1,4 +1,4 @@
-import * as Colyseus from "colyseus.js";
+import * as Colyseus from "@colyseus/sdk";
 import { DOMAIN } from "./constants";
 
 export const CLIENT = new Colyseus.Client(

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import * as Colyseus from "colyseus.js";
+import * as Colyseus from "@colyseus/sdk";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 

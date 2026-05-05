@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import * as Colyseus from "colyseus.js";
+import * as Colyseus from "@colyseus/sdk";
 
 interface AppState {
   solved: number;
