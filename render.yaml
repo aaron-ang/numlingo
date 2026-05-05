@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: numlingo
+    runtime: node
+    plan: free
+    region: ohio
+    rootDir: server
+    buildCommand: bun install --frozen-lockfile
+    startCommand: bun run src/index.ts
+    healthCheckPath: /hello_world
+    envVars:
+      - key: NODE_ENV
+        value: production

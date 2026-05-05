@@ -1,7 +1,7 @@
-import { Room, Client } from "@colyseus/core";
+import { Room, Client, CloseCode } from "@colyseus/core";
 import { MyRoomState, Player } from "./schema/MyRoomState";
 
-export class MyRoom extends Room<MyRoomState> {
+export class MyRoom extends Room<{ state: MyRoomState }> {
   maxClients = 4;
 
   onCreate(options: any) {
@@ -35,10 +35,10 @@ export class MyRoom extends Room<MyRoomState> {
     this.broadcast("players", [...this.state.players.keys()]);
   }
 
-  async onLeave(client: Client, consented: boolean) {
+  async onLeave(client: Client, code?: number) {
     console.log(client.sessionId, "left!");
     try {
-      if (consented) {
+      if (code === CloseCode.CONSENTED) {
         throw new Error("consented leave");
       }
       // allow disconnected client to reconnect into this room
