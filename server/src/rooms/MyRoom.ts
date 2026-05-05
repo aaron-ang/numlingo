@@ -19,15 +19,15 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
       });
     });
 
-    this.onMessage("start", (client) => {
+    this.onMessage("start", async (client) => {
       const player = this.state.players.get(client.sessionId);
       if (!player || player.status !== "idle") return;
       player.status = "playing";
       // Lock once anyone has started so new joiners can't slip into a live game.
-      if (!this.locked) this.lock();
+      if (!this.locked) await this.lock();
     });
 
-    this.onMessage("end", (client) => {
+    this.onMessage("end", async (client) => {
       const player = this.state.players.get(client.sessionId);
       if (!player || player.status !== "playing") return;
       player.status = "done";
@@ -35,7 +35,7 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
         id: client.sessionId,
         solved: player.solved,
       });
-      this.maybeReset();
+      await this.maybeReset();
     });
   }
 
@@ -48,7 +48,7 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
   async onLeave(client: Client, code?: number) {
     console.log(client.sessionId, "left!", "code=", code);
     if (code === CloseCode.CONSENTED) {
-      this.removePlayer(client.sessionId);
+      await this.removePlayer(client.sessionId);
       return;
     }
     try {
@@ -63,7 +63,7 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
       }
     } catch (e) {
       console.error("RECONNECT FAILED", client.sessionId, e);
-      this.removePlayer(client.sessionId);
+      await this.removePlayer(client.sessionId);
     }
   }
 
@@ -77,18 +77,18 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
     console.log("room", this.roomId, "disposing...");
   }
 
-  private removePlayer(sessionId: string) {
+  private async removePlayer(sessionId: string) {
     if (!this.state.players.has(sessionId)) return;
     this.state.players.delete(sessionId);
     this.broadcast("players", [...this.state.players.keys()]);
-    this.maybeReset();
+    await this.maybeReset();
   }
 
   // Reopen the room once no players are mid-game; reset everyone's status
   // so the next round starts cleanly.
-  private maybeReset() {
+  private async maybeReset() {
     if (this.state.players.size === 0) {
-      if (this.locked) this.unlock();
+      if (this.locked) await this.unlock();
       return;
     }
     const stillPlaying = [...this.state.players.values()].some(
@@ -99,6 +99,6 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
       p.status = "idle";
       p.solved = 0;
     });
-    if (this.locked) this.unlock();
+    if (this.locked) await this.unlock();
   }
 }
