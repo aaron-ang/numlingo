@@ -1,8 +1,9 @@
 type LanguageMenuProps = {
   selectOption: (e: React.MouseEvent<HTMLAnchorElement>) => void;
+  currentLocale: string;
 };
 
-const LanguageMenu = ({ selectOption }: LanguageMenuProps) => {
+const LanguageMenu = ({ selectOption, currentLocale }: LanguageMenuProps) => {
   const languageCodes = {
     Arabic: "ar",
     Azerbaijani: "az",
@@ -48,19 +49,22 @@ const LanguageMenu = ({ selectOption }: LanguageMenuProps) => {
   };
 
   return (
-    <div className="absolute mt-3 flex max-h-96 w-full flex-col overflow-y-auto rounded border border-sub-color text-2xl">
-      {Object.entries(languageCodes).map(([language, code], i) => (
-        <a
-          key={i}
-          id={code}
-          className={`cursor-pointer py-1 hover:text-white ${
-            i % 2 ? "bg-bg-color" : "bg-sub-color"
-          }`}
-          onClick={selectOption}
-        >
-          {language}
-        </a>
-      ))}
+    <div className="border-sub-color bg-sub-color divide-bg-color/40 absolute left-1/2 z-10 mt-3 flex max-h-96 w-64 -translate-x-1/2 flex-col divide-y overflow-y-auto rounded border text-xl shadow-lg">
+      {Object.entries(languageCodes).map(([language, code]) => {
+        const isSelected = code === currentLocale;
+        return (
+          <a
+            key={code}
+            id={code}
+            className={`hover:bg-bg-color hover:text-accent cursor-pointer px-4 py-1.5 transition-colors ${
+              isSelected ? "text-accent" : "text-text-accent"
+            }`}
+            onClick={selectOption}
+          >
+            {language}
+          </a>
+        );
+      })}
     </div>
   );
 };

@@ -12,7 +12,7 @@ const Navbar = () => {
       <div className="mx-auto flex max-w-(--breakpoint-xl) flex-wrap items-center justify-between px-8">
         <Link
           href="/"
-          className="self-center whitespace-nowrap px-3 py-2 text-3xl font-semibold text-text-accent"
+          className="text-text-accent self-center px-3 py-2 text-3xl font-semibold whitespace-nowrap"
         >
           Numlingo
         </Link>
@@ -20,7 +20,7 @@ const Navbar = () => {
         <button
           data-collapse-toggle="navbar-default"
           type="button"
-          className="inline-flex h-10 w-10 items-center justify-center rounded-lg p-2 text-sm text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 md:hidden"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-lg p-2 text-sm text-gray-500 hover:bg-gray-100 focus:ring-2 focus:ring-gray-200 focus:outline-none md:hidden"
           aria-controls="navbar-default"
           aria-expanded="false"
         >
@@ -48,7 +48,7 @@ const Navbar = () => {
               <li key={key}>
                 <a
                   href={value}
-                  className="block rounded px-3 py-2 text-xl text-sub-color hover:bg-sub-color hover:text-accent md:text-2xl"
+                  className="text-text-muted hover:bg-sub-color hover:text-accent block rounded px-3 py-2 text-xl md:text-2xl"
                 >
                   {key}
                 </a>

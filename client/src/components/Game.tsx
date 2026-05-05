@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import * as Colyseus from "@colyseus/sdk";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -49,12 +49,28 @@ const Game = () => {
 
   const inputRef = useRef<HTMLInputElement>(null);
   const promptRef = useRef<HTMLHeadingElement>(null);
+  const languageDropdownRef = useRef<HTMLDivElement>(null);
   const roomRef = useRef<Colyseus.Room | null>(null);
   const tickIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const endTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // True for user-initiated leaves and server "shutdown" — onLeave can't
   // distinguish those from a failed reconnect, so we tag them ourselves.
   const cleanExitRef = useRef(false);
+
+  useEffect(() => {
+    if (!languageMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        languageDropdownRef.current &&
+        !languageDropdownRef.current.contains(e.target as Node)
+      ) {
+        setLanguageMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () =>
+      document.removeEventListener("mousedown", handleClickOutside);
+  }, [languageMenuOpen]);
 
   const stopTimer = () => {
     if (tickIntervalRef.current) {
@@ -200,17 +216,17 @@ const Game = () => {
 
   return (
     <>
-      <div className="relative w-full text-center">
+      <div ref={languageDropdownRef} className="relative text-center">
         {isTiming ? (
           <>
-            <h1 className="text-3xl text-green-900">{solved}</h1>
-            <h1 className="text-5xl text-sub-color">{seconds}</h1>
+            <h1 className="text-3xl text-emerald-400">{solved}</h1>
+            <h1 className="text-text-accent text-5xl">{seconds}</h1>
           </>
         ) : gameRoom ? (
-          <h1 className="text-2xl text-accent sm:text-3xl">{language}</h1>
+          <h1 className="text-accent text-2xl sm:text-3xl">{language}</h1>
         ) : (
           <button
-            className={`inline-flex items-center text-2xl text-sub-color first-letter:text-center hover:cursor-pointer hover:text-text-accent sm:text-3xl ${languageMenuOpen && "text-text-accent"}`}
+            className={`text-text-muted hover:text-text-accent inline-flex items-center text-2xl first-letter:text-center hover:cursor-pointer sm:text-3xl ${languageMenuOpen && "text-text-accent"}`}
             onClick={() => setLanguageMenuOpen(!languageMenuOpen)}
           >
             {language}
@@ -223,20 +239,22 @@ const Game = () => {
             >
               <path
                 stroke="currentColor"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
                 d="m1 1 4 4 4-4"
               />
             </svg>
           </button>
         )}
 
-        {languageMenuOpen && <LanguageMenu selectOption={selectOption} />}
+        {languageMenuOpen && (
+          <LanguageMenu selectOption={selectOption} currentLocale={locale} />
+        )}
       </div>
       <h1
         ref={promptRef}
-        className="my-10 text-center text-3xl font-medium text-text-accent md:text-5xl lg:text-7xl"
+        className="text-text-accent my-10 text-center text-3xl font-medium md:text-5xl lg:text-7xl"
       >
         {prompt}
       </h1>
@@ -247,7 +265,7 @@ const Game = () => {
         onChange={handleInputChange}
         onKeyDown={handleKeyDown}
         autoFocus
-        className="w-1/2 rounded border border-sub-color bg-transparent px-5 py-2 text-center text-2xl text-text-accent"
+        className="border-sub-color text-text-accent w-1/2 rounded border bg-transparent px-5 py-2 text-center text-2xl"
       />
 
       {communicating ? (
@@ -255,7 +273,7 @@ const Game = () => {
       ) : isTiming ? null : gameRoom ? (
         <button
           onClick={leaveRoom}
-          className="m-3 rounded-md px-3 py-2 text-xl font-medium text-sub-color hover:bg-sub-color hover:text-accent sm:text-2xl"
+          className="text-text-muted hover:bg-sub-color hover:text-accent m-3 cursor-pointer rounded-md px-3 py-2 text-xl font-medium sm:text-2xl"
           aria-current="page"
         >
           Leave
@@ -263,7 +281,7 @@ const Game = () => {
       ) : (
         <button
           onClick={joinRoom}
-          className="m-3 rounded-md px-3 py-2 text-xl font-medium text-sub-color hover:bg-sub-color hover:text-accent sm:text-2xl"
+          className="text-text-muted hover:bg-sub-color hover:text-accent m-3 cursor-pointer rounded-md px-3 py-2 text-xl font-medium sm:text-2xl"
           aria-current="page"
         >
           Join Multiplayer
