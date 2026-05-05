@@ -12,10 +12,8 @@ import {
   DEFAULT_LANGUAGE,
   DEFAULT_LOCALE,
   DEFAULT_TIMEOUT,
-  RECONNECT_TIMEOUT_MS,
-  WS_CLOSE_ERROR_CODES,
 } from "@/utils/constants";
-import { isEmpty, asyncWithTimeout } from "@/utils/helper";
+import { isEmpty } from "@/utils/helper";
 import { CLIENT } from "@/utils/multiplayer";
 import { numToString } from "@/utils/numberConverter";
 import { useAppStore } from "@/utils/store";
@@ -52,7 +50,10 @@ const Game = () => {
   const inputRef = useRef<HTMLInputElement>(null);
   const promptRef = useRef<HTMLHeadingElement>(null);
   const roomRef = useRef<Colyseus.Room | null>(null);
-  const intentionalLeaveRef = useRef(false);
+  // Set when the user clicks Leave, or when the server broadcasts "shutdown".
+  // The SDK's onLeave event fires in both clean-exit and reconnect-exhausted
+  // cases — this flag lets us suppress the "Disconnected" toast for clean ones.
+  const cleanExitRef = useRef(false);
 
   const generatePrompt = (nextLocale: string) => {
     const num = Math.floor(Math.random() * 1000);
@@ -111,30 +112,6 @@ const Game = () => {
     }
   };
 
-  const adoptRoom = (room: Colyseus.Room) => {
-    // Server-side state machine handles unlock; we run our own reconnection
-    // logic in onLeave, so silence the SDK's competing 15-retry loop.
-    room.reconnection.enabled = false;
-    roomRef.current = room;
-    setGameRoom(room);
-    setRoomCallbacks(room);
-  };
-
-  const joinRoom = async () => {
-    setCommunicating(true);
-    intentionalLeaveRef.current = false;
-    try {
-      const room = await CLIENT.joinOrCreate(locale);
-      adoptRoom(room);
-      console.log(room.sessionId, "joined", room.name);
-    } catch (e) {
-      console.error("JOIN ERROR", e);
-      toast.error("Unable to connect. Please try again later.");
-    } finally {
-      setCommunicating(false);
-    }
-  };
-
   const tearDown = () => {
     roomRef.current = null;
     setGameRoom(null);
@@ -147,62 +124,61 @@ const Game = () => {
       setFinalScores(Object.fromEntries(res.map((playerID) => [playerID, -1])));
     });
     room.onMessage("update", (res: { id: string; solved: number }) => {
-      updatePlayerScores((prev) => ({
-        ...prev,
-        [res.id]: res.solved,
-      }));
+      updatePlayerScores((prev) => ({ ...prev, [res.id]: res.solved }));
     });
     room.onMessage("final", (res: { id: string; solved: number }) => {
-      // Server auto-unlocks when everyone is done — no need to send "unlock".
+      // Server auto-unlocks when everyone is done — no client send needed.
       updateFinalScores((prev) => ({ ...prev, [res.id]: res.solved }));
     });
     room.onMessage("shutdown", () => {
-      // Graceful server shutdown: skip reconnect, tell user, clean up.
-      intentionalLeaveRef.current = true;
+      // Server is going down. Skip reconnect retries entirely so the SDK
+      // doesn't burn 15 attempts against a host that won't be coming back.
+      cleanExitRef.current = true;
+      room.reconnection.enabled = false;
       toast.info("Server is restarting. Please rejoin in a moment.");
     });
 
-    room.onLeave(async (code: number) => {
-      console.log(`${room.sessionId} left with code ${code}`);
-
-      if (intentionalLeaveRef.current) {
-        intentionalLeaveRef.current = false;
-        tearDown();
-        return;
-      }
-
-      toast.info("Disconnected.");
-      if (!WS_CLOSE_ERROR_CODES.includes(code)) {
-        tearDown();
-        return;
-      }
-
-      setCommunicating(true);
-      toast.info("Attempting to reconnect...");
-      try {
-        const newRoom = await asyncWithTimeout(
-          CLIENT.reconnect(room.reconnectionToken),
-          RECONNECT_TIMEOUT_MS,
-        );
-        adoptRoom(newRoom);
-        console.log(newRoom.sessionId, "rejoined", newRoom.name);
-        toast.success("Reconnected!");
-      } catch (e) {
-        console.error("RECONNECT ERROR", e);
-        toast.error("Unable to reconnect.");
-        tearDown();
-      } finally {
-        setCommunicating(false);
-      }
+    // SDK's reconnect kicks in. Fires once when the connection drops and
+    // retries begin; we don't get a per-attempt callback.
+    room.onDrop(() => {
+      toast.info("Connection lost. Reconnecting…");
     });
 
-    room.onError((code: number, message?: string) => {
+    // Fires after a clean leave OR after the SDK exhausts its reconnect
+    // retries — never mid-retry.
+    room.onLeave((code) => {
+      console.log(`${room.sessionId} left with code ${code}`);
+      if (!cleanExitRef.current) {
+        toast.error("Disconnected.");
+      }
+      cleanExitRef.current = false;
+      tearDown();
+    });
+
+    room.onError((code, message) => {
       console.error(`error occurred with code ${code}:`, message);
     });
   };
 
+  const joinRoom = async () => {
+    setCommunicating(true);
+    cleanExitRef.current = false;
+    try {
+      const room = await CLIENT.joinOrCreate(locale);
+      roomRef.current = room;
+      setGameRoom(room);
+      setRoomCallbacks(room);
+      console.log(room.sessionId, "joined", room.name);
+    } catch (e) {
+      console.error("JOIN ERROR", e);
+      toast.error("Unable to connect. Please try again later.");
+    } finally {
+      setCommunicating(false);
+    }
+  };
+
   const leaveRoom = () => {
-    intentionalLeaveRef.current = true;
+    cleanExitRef.current = true;
     roomRef.current?.leave();
   };
 
