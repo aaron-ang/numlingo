@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import * as Colyseus from "colyseus.js";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -19,15 +19,15 @@ import { CLIENT } from "@/utils/multiplayer";
 import { numToString } from "@/utils/numberConverter";
 import { useAppStore } from "@/utils/store";
 
-let ROOM: Colyseus.Room;
-
 const Game = () => {
   const [language, setLanguage] = useState(DEFAULT_LANGUAGE);
   const [locale, setLocale] = useState(DEFAULT_LOCALE);
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
 
-  const [number, setNumber] = useState(0);
-  const [prompt, setPrompt] = useState("");
+  const [{ number, prompt }, setPromptState] = useState(() => {
+    const num = Math.floor(Math.random() * 1000);
+    return { number: num, prompt: numToString(num, DEFAULT_LOCALE) };
+  });
   const [seconds, setSeconds] = useState(DEFAULT_TIMEOUT);
   const [isTiming, setIsTiming] = useState(false);
 
@@ -35,7 +35,6 @@ const Game = () => {
     solved,
     gameRoom,
     playerScores,
-    finalScores,
     communicating,
     incrementSolved,
     updateIncorrect,
@@ -51,21 +50,19 @@ const Game = () => {
 
   const inputRef = useRef<HTMLInputElement>(null);
   const promptRef = useRef<HTMLHeadingElement>(null);
+  const roomRef = useRef<Colyseus.Room | null>(null);
 
-  useEffect(() => {
-    generatePrompt(locale);
-  }, [locale]);
-
-  const generatePrompt = (locale: string) => {
+  const generatePrompt = (nextLocale: string) => {
     const num = Math.floor(Math.random() * 1000);
-    setNumber(num);
-    setPrompt(numToString(num, locale));
+    setPromptState({ number: num, prompt: numToString(num, nextLocale) });
   };
 
   const selectOption = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    const nextLocale = e.currentTarget.id;
     setLanguage(e.currentTarget.innerText);
-    setLocale(e.currentTarget.id);
+    setLocale(nextLocale);
     setLanguageMenuOpen(false);
+    generatePrompt(nextLocale);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -115,10 +112,11 @@ const Game = () => {
   const joinRoom = async () => {
     setCommunicating(true);
     try {
-      ROOM = await CLIENT.joinOrCreate(locale);
-      setGameRoom(ROOM);
-      console.log(ROOM.sessionId, "joined", ROOM.name);
-      setRoomCallbacks();
+      const room = await CLIENT.joinOrCreate(locale);
+      roomRef.current = room;
+      setGameRoom(room);
+      console.log(room.sessionId, "joined", room.name);
+      setRoomCallbacks(room);
     } catch (e) {
       console.error("JOIN ERROR", e);
       toast.error("Unable to connect. Please try again later.");
@@ -127,39 +125,43 @@ const Game = () => {
     }
   };
 
-  const setRoomCallbacks = () => {
-    ROOM.onMessage("players", (res: string[]) => {
+  const setRoomCallbacks = (room: Colyseus.Room) => {
+    room.onMessage("players", (res: string[]) => {
       setPlayerScores(Object.fromEntries(res.map((playerID) => [playerID, 0])));
       setFinalScores(Object.fromEntries(res.map((playerID) => [playerID, -1])));
     });
-    ROOM.onMessage("update", (res: { id: string; solved: number }) => {
+    room.onMessage("update", (res: { id: string; solved: number }) => {
       updatePlayerScores((prev) => ({
         ...prev,
         [res.id]: res.solved,
       }));
     });
-    ROOM.onMessage("final", (res: { id: string; solved: number }) => {
-      updateFinalScores((prev) => ({
-        ...prev,
-        [res.id]: res.solved,
-      }));
-      if (Object.values(finalScores).every((score) => score !== -1))
-        ROOM.send("unlock");
+    room.onMessage("final", (res: { id: string; solved: number }) => {
+      updateFinalScores((prev) => {
+        const next = { ...prev, [res.id]: res.solved };
+        if (Object.values(next).every((score) => score !== -1)) {
+          room.send("unlock");
+        }
+        return next;
+      });
     });
 
-    ROOM.onLeave(async (code) => {
-      console.log(`${ROOM.sessionId} left with code ${code}`);
+    room.onLeave(async (code: number) => {
+      console.log(`${room.sessionId} left with code ${code}`);
       toast.info("Disconnected.");
       // handle arbtrary disconnects
-      if (code in WS_CLOSE_ERROR_CODES) {
+      if (WS_CLOSE_ERROR_CODES.includes(code)) {
         setCommunicating(true);
         toast.info("Attempting to reconnect...");
         try {
-          await asyncWithTimeout(
-            CLIENT.reconnect(ROOM.reconnectionToken),
+          const newRoom = await asyncWithTimeout(
+            CLIENT.reconnect(room.reconnectionToken),
             2500,
           );
-          console.log(ROOM.sessionId, "rejoined", ROOM.name);
+          roomRef.current = newRoom;
+          setGameRoom(newRoom);
+          setRoomCallbacks(newRoom);
+          console.log(newRoom.sessionId, "rejoined", newRoom.name);
           toast.success("Reconnected!");
           setCommunicating(false);
           return;
@@ -169,10 +171,11 @@ const Game = () => {
         }
         setCommunicating(false);
       }
+      roomRef.current = null;
       setGameRoom(null);
       setPlayerScores({});
     });
-    ROOM.onError((code, message) => {
+    room.onError((code: number, message?: string) => {
       console.error(`error occurred with code ${code}:`, message);
     });
   };
@@ -193,10 +196,7 @@ const Game = () => {
           <h1 className="text-2xl text-accent sm:text-3xl">{language}</h1>
         ) : (
           <button
-            className={`inline-flex items-center text-2xl text-sub-color
-                      first-letter:text-center hover:cursor-pointer 
-                      hover:text-text-accent sm:text-3xl
-                        ${languageMenuOpen && "text-text-accent"}`}
+            className={`inline-flex items-center text-2xl text-sub-color first-letter:text-center hover:cursor-pointer hover:text-text-accent sm:text-3xl ${languageMenuOpen && "text-text-accent"}`}
             onClick={() => setLanguageMenuOpen(!languageMenuOpen)}
           >
             {language}
@@ -233,11 +233,7 @@ const Game = () => {
         onChange={handleInputChange}
         onKeyDown={handleKeyDown}
         autoFocus
-        className="
-                    w-1/2 rounded border border-sub-color bg-transparent px-5 py-2 
-                    text-center text-2xl
-                    text-text-accent
-                "
+        className="w-1/2 rounded border border-sub-color bg-transparent px-5 py-2 text-center text-2xl text-text-accent"
       />
 
       {communicating ? (
@@ -245,7 +241,7 @@ const Game = () => {
       ) : isTiming ? null : gameRoom ? (
         <button
           onClick={leaveRoom}
-          className=" m-3 rounded-md px-3 py-2 text-xl font-medium text-sub-color hover:bg-sub-color hover:text-accent sm:text-2xl"
+          className="m-3 rounded-md px-3 py-2 text-xl font-medium text-sub-color hover:bg-sub-color hover:text-accent sm:text-2xl"
           aria-current="page"
         >
           Leave

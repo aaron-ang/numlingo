@@ -26,7 +26,7 @@ const LanguageMenu = ({ selectOption }: LanguageMenuProps) => {
           key={i}
           id={code}
           className={`cursor-pointer py-1 hover:text-white ${
-            i % 2 ? "bg-bg-color" : " bg-sub-color"
+            i % 2 ? "bg-bg-color" : "bg-sub-color"
           }`}
           onClick={selectOption}
         >
