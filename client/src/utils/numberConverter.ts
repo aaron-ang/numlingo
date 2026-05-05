@@ -1,4 +1,4 @@
-import n2words from "n2words";
+import n2words, { type LanguageCode } from "n2words";
 import { number2kanji } from "@geolonia/japanese-numeral";
 
 export const numToString = (n: number, locale: string): string => {
@@ -8,7 +8,7 @@ export const numToString = (n: number, locale: string): string => {
     case "ja":
       return number2kanji(n);
     default:
-      return n2words(n, { lang: locale });
+      return n2words(n, { lang: locale as LanguageCode });
   }
 };
 
