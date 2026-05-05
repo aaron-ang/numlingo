@@ -35,7 +35,6 @@ const Game = () => {
     solved,
     gameRoom,
     playerScores,
-    finalScores,
     communicating,
     incrementSolved,
     updateIncorrect,
@@ -138,27 +137,31 @@ const Game = () => {
       }));
     });
     room.onMessage("final", (res: { id: string; solved: number }) => {
-      updateFinalScores((prev) => ({
-        ...prev,
-        [res.id]: res.solved,
-      }));
-      if (Object.values(finalScores).every((score) => score !== -1))
-        room.send("unlock");
+      updateFinalScores((prev) => {
+        const next = { ...prev, [res.id]: res.solved };
+        if (Object.values(next).every((score) => score !== -1)) {
+          room.send("unlock");
+        }
+        return next;
+      });
     });
 
     room.onLeave(async (code: number) => {
       console.log(`${room.sessionId} left with code ${code}`);
       toast.info("Disconnected.");
       // handle arbtrary disconnects
-      if (code in WS_CLOSE_ERROR_CODES) {
+      if (WS_CLOSE_ERROR_CODES.includes(code)) {
         setCommunicating(true);
         toast.info("Attempting to reconnect...");
         try {
-          await asyncWithTimeout(
+          const newRoom = await asyncWithTimeout(
             CLIENT.reconnect(room.reconnectionToken),
             2500,
           );
-          console.log(room.sessionId, "rejoined", room.name);
+          roomRef.current = newRoom;
+          setGameRoom(newRoom);
+          setRoomCallbacks(newRoom);
+          console.log(newRoom.sessionId, "rejoined", newRoom.name);
           toast.success("Reconnected!");
           setCommunicating(false);
           return;
