@@ -10,7 +10,7 @@
   "scripts": {
     "start": "bun run src/index.ts",
     "dev": "bun run --watch src/index.ts",
-    "loadtest": "bun run loadtest/example.ts --room my_room --numClients 2",
+    "loadtest": "bun run loadtest/example.ts --room en --numClients 2",
     "typecheck": "tsc",
     "test": "mocha -r tsx test/**_test.ts --exit --timeout 15000"
   },
