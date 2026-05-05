@@ -50,9 +50,22 @@ const Game = () => {
   const inputRef = useRef<HTMLInputElement>(null);
   const promptRef = useRef<HTMLHeadingElement>(null);
   const roomRef = useRef<Colyseus.Room | null>(null);
+  const tickIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const endTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // True for user-initiated leaves and server "shutdown" — onLeave can't
   // distinguish those from a failed reconnect, so we tag them ourselves.
   const cleanExitRef = useRef(false);
+
+  const stopTimer = () => {
+    if (tickIntervalRef.current) {
+      clearInterval(tickIntervalRef.current);
+      tickIntervalRef.current = null;
+    }
+    if (endTimeoutRef.current) {
+      clearTimeout(endTimeoutRef.current);
+      endTimeoutRef.current = null;
+    }
+  };
 
   const generatePrompt = (nextLocale: string) => {
     const num = Math.floor(Math.random() * 1000);
@@ -70,13 +83,13 @@ const Game = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!isTiming) {
       setIsTiming(true);
-      const id = setInterval(() => {
+      tickIntervalRef.current = setInterval(() => {
         setSeconds((prev) => prev - 1);
       }, 1000);
 
-      setTimeout(() => {
+      endTimeoutRef.current = setTimeout(() => {
         roomRef.current?.send("end");
-        clearInterval(id);
+        stopTimer();
         setIsTiming(false);
         setSeconds(DEFAULT_TIMEOUT);
         updatePlayerScores((prev) => {
@@ -112,9 +125,14 @@ const Game = () => {
   };
 
   const tearDown = () => {
+    stopTimer();
     roomRef.current = null;
     setGameRoom(null);
     setPlayerScores({});
+    setFinalScores({});
+    setIsTiming(false);
+    setIsCompleted(false);
+    setSeconds(DEFAULT_TIMEOUT);
   };
 
   const setRoomCallbacks = (room: Colyseus.Room) => {
