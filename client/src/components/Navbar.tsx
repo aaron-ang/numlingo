@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 const Navbar = () => {
   const options = {
     About: "/about",
@@ -8,12 +10,12 @@ const Navbar = () => {
   return (
     <nav className="bg-transparent pt-3">
       <div className="mx-auto flex max-w-screen-xl flex-wrap items-center justify-between px-8">
-        <a
+        <Link
           href="/"
           className="self-center whitespace-nowrap px-3 py-2 text-3xl font-semibold text-text-accent"
         >
           Numlingo
-        </a>
+        </Link>
 
         <button
           data-collapse-toggle="navbar-default"
