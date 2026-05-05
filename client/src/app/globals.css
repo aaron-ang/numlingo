@@ -1,18 +1,24 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+@theme {
+  --color-bg-color: #222831;
+  --color-sub-color: #393e46;
+  --color-accent: #ffc435;
+  --color-text-accent: #eeeeee;
 }
 
 @layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
   input[type="number"]::-webkit-outer-spin-button,
   input[type="number"]::-webkit-inner-spin-button,
   input[type="number"] {
     -webkit-appearance: none;
+    appearance: none;
     margin: 0;
     -moz-appearance: textfield !important;
   }
@@ -20,6 +26,7 @@
   select {
     -moz-appearance: none;
     -webkit-appearance: none;
+    appearance: none;
   }
 
   select::-ms-expand {

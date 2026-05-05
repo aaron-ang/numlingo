@@ -9,7 +9,7 @@ const Navbar = () => {
 
   return (
     <nav className="bg-transparent pt-3">
-      <div className="mx-auto flex max-w-screen-xl flex-wrap items-center justify-between px-8">
+      <div className="mx-auto flex max-w-(--breakpoint-xl) flex-wrap items-center justify-between px-8">
         <Link
           href="/"
           className="self-center whitespace-nowrap px-3 py-2 text-3xl font-semibold text-text-accent"

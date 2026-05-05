@@ -10,8 +10,7 @@
   },
   "dependencies": {
     "@colyseus/sdk": "^0.17.42",
-    "@geolonia/japanese-numeral": "^1.0.2",
-    "n2words": "^1.19.1",
+    "n2words": "^4.0.0",
     "next": "^16.2.4",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
@@ -19,17 +18,17 @@
     "zustand": "^5.0.13"
   },
   "devDependencies": {
-    "@types/node": "^20",
+    "@tailwindcss/postcss": "^4.2.4",
+    "@types/node": "^25.6.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "autoprefixer": "^10",
-    "eslint": "^9.3.0",
+    "eslint": "^9",
     "eslint-config-next": "^16.2.4",
     "postcss": "^8",
     "prettier": "^3.8.3",
     "prettier-plugin-tailwindcss": "^0.8.0",
-    "tailwindcss": "^3.4.18",
-    "typescript": "^5"
+    "tailwindcss": "^4.2.4",
+    "typescript": "^6.0.3"
   },
   "trustedDependencies": [
     "unrs-resolver"

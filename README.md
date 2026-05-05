@@ -6,14 +6,49 @@ Are you learning a new language? Sharpen your skills with Numlingo! Numlingo all
 
 ## Languages Supported
 
-- English
-- Chinese(Simplified)
-- Spanish
-- French
 - Arabic
-- Russian
-- Portuguese
-- Indonesian
+- Azerbaijani
+- Bengali
+- Chinese (Simplified)
+- Croatian
+- Czech
+- Danish
+- Dutch
+- English
+- French
 - German
-- Japanese(Kanji)
-- Korean(Sino)
+- Greek
+- Gujarati
+- Hebrew
+- Hindi
+- Hungarian
+- Indonesian
+- Italian
+- Japanese (Kanji)
+- Kannada
+- Korean (Sino)
+- Lithuanian
+- Malay
+- Norwegian
+- Persian
+- Polish
+- Portuguese
+- Punjabi
+- Romanian
+- Russian
+- Serbian (Latin)
+- Spanish
+- Swahili
+- Swedish
+- Tamil
+- Telugu
+- Thai
+- Turkish
+- Ukrainian
+- Urdu
+- Vietnamese
+
+## Number-to-words conversion
+
+- [n2words](https://www.npmjs.com/package/n2words) — covers most of the languages above.
+- Custom converter in `client/src/utils/numberConverter.ts` — Simplified Chinese.
