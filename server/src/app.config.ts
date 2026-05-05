@@ -1,63 +1,60 @@
 import config from "@colyseus/tools";
 import { monitor } from "@colyseus/monitor";
 import { playground } from "@colyseus/playground";
+import basicAuth from "express-basic-auth";
 
-/**
- * Import your Room files
- */
 import { MyRoom } from "./rooms/MyRoom";
+
+const ROOMS = [
+  "en",
+  "zh",
+  "es",
+  "fr",
+  "ar",
+  "ru",
+  "pt",
+  "id",
+  "de",
+  "ja",
+  "ko",
+];
 
 export default config({
   initializeGameServer: (gameServer) => {
-    /**
-     * Define your room handlers:
-     */
-    const rooms = [
-      "en",
-      "zh",
-      "es",
-      "fr",
-      "ar",
-      "ru",
-      "pt",
-      "id",
-      "de",
-      "ja",
-      "ko",
-    ];
-    for (const room of rooms) {
+    for (const room of ROOMS) {
       gameServer.define(room, MyRoom, { lang: room });
     }
   },
 
   initializeExpress: (app) => {
-    /**
-     * Bind your custom express routes here:
-     * Read more: https://expressjs.com/en/starter/basic-routing.html
-     */
-    app.get("/hello_world", (req, res) => {
+    app.get("/hello_world", (_req, res) => {
       res.send("It's time to kick ass and chew bubblegum!");
     });
 
-    /**
-     * Use @colyseus/playground
-     * (It is not recommended to expose this route in a production environment)
-     */
     if (process.env.NODE_ENV !== "production") {
       app.use("/", playground);
     }
 
-    /**
-     * Use @colyseus/monitor
-     * It is recommended to protect this route with a password
-     * Read more: https://docs.colyseus.io/tools/monitor/#restrict-access-to-the-panel-using-a-password
-     */
-    app.use("/colyseus", monitor());
+    // Mount the colyseus monitor only if a password is set. The monitor
+    // exposes room state and lets the operator kick clients, so leaving it
+    // open is unsafe — fail closed instead.
+    const monitorPassword = process.env.MONITOR_PASSWORD;
+    if (monitorPassword) {
+      const monitorUser = process.env.MONITOR_USERNAME ?? "admin";
+      app.use(
+        "/colyseus",
+        basicAuth({
+          users: { [monitorUser]: monitorPassword },
+          challenge: true,
+        }),
+        monitor(),
+      );
+    } else {
+      console.warn(
+        "MONITOR_PASSWORD not set — /colyseus monitor route is disabled",
+      );
+    }
   },
 
-  beforeListen: () => {
-    /**
-     * Before before gameServer.listen() is called.
-     */
-  },
+  beforeListen: () => {},
 });
