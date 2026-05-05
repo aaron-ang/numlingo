@@ -50,9 +50,8 @@ const Game = () => {
   const inputRef = useRef<HTMLInputElement>(null);
   const promptRef = useRef<HTMLHeadingElement>(null);
   const roomRef = useRef<Colyseus.Room | null>(null);
-  // Set when the user clicks Leave, or when the server broadcasts "shutdown".
-  // The SDK's onLeave event fires in both clean-exit and reconnect-exhausted
-  // cases — this flag lets us suppress the "Disconnected" toast for clean ones.
+  // True for user-initiated leaves and server "shutdown" — onLeave can't
+  // distinguish those from a failed reconnect, so we tag them ourselves.
   const cleanExitRef = useRef(false);
 
   const generatePrompt = (nextLocale: string) => {
@@ -127,25 +126,19 @@ const Game = () => {
       updatePlayerScores((prev) => ({ ...prev, [res.id]: res.solved }));
     });
     room.onMessage("final", (res: { id: string; solved: number }) => {
-      // Server auto-unlocks when everyone is done — no client send needed.
       updateFinalScores((prev) => ({ ...prev, [res.id]: res.solved }));
     });
     room.onMessage("shutdown", () => {
-      // Server is going down. Skip reconnect retries entirely so the SDK
-      // doesn't burn 15 attempts against a host that won't be coming back.
       cleanExitRef.current = true;
+      // Don't waste retries against a host we know is going away.
       room.reconnection.enabled = false;
       toast.info("Server is restarting. Please rejoin in a moment.");
     });
 
-    // SDK's reconnect kicks in. Fires once when the connection drops and
-    // retries begin; we don't get a per-attempt callback.
     room.onDrop(() => {
       toast.info("Connection lost. Reconnecting…");
     });
 
-    // Fires after a clean leave OR after the SDK exhausts its reconnect
-    // retries — never mid-retry.
     room.onLeave((code) => {
       console.log(`${room.sessionId} left with code ${code}`);
       if (!cleanExitRef.current) {
