@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "outDir": "build",
+    "noEmit": true,
     "target": "ESNext",
     "module": "CommonJS",
     "moduleResolution": "node",
@@ -13,7 +13,5 @@
     "forceConsistentCasingInFileNames": true,
     "useDefineForClassFields": false
   },
-  "include": [
-    "src"
-  ]
+  "include": ["src"]
 }
