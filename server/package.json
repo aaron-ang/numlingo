@@ -12,6 +12,7 @@
     "dev": "bun run --watch src/index.ts",
     "loadtest": "bun run loadtest/example.ts --room en --numClients 2",
     "typecheck": "tsc",
+    "lint": "eslint .",
     "test": "mocha -r tsx test/**_test.ts --exit --timeout 15000"
   },
   "author": "",
@@ -19,11 +20,14 @@
   "devDependencies": {
     "@colyseus/loadtest": "^0.17.8",
     "@colyseus/testing": "^0.17.11",
+    "@eslint/js": "^10.0.1",
     "@types/express": "^5.0.6",
     "@types/mocha": "^10.0.10",
+    "eslint": "^10.3.0",
     "mocha": "^11.7.5",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.59.2"
   },
   "dependencies": {
     "@colyseus/bun-websockets": "^0.17.13",

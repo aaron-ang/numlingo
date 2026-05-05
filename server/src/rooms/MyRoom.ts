@@ -4,9 +4,9 @@ import { MyRoomState, Player } from "./schema/MyRoomState";
 export class MyRoom extends Room<{ state: MyRoomState }> {
   maxClients = 4;
 
-  onCreate(options: any) {
+  onCreate(_options: { lang: string }) {
     this.setState(new MyRoomState());
-    this.onMessage("solve", (client, message) => {
+    this.onMessage("solve", (client) => {
       const player = this.state.players.get(client.sessionId);
       player.solved++;
       this.broadcast("update", {
@@ -14,22 +14,22 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
         solved: player.solved,
       });
     });
-    this.onMessage("start", (client, message) => {
+    this.onMessage("start", () => {
       this.lock();
     });
-    this.onMessage("end", (client, message) => {
+    this.onMessage("end", (client) => {
       const player = this.state.players.get(client.sessionId);
       this.broadcast("final", {
         id: client.sessionId,
         solved: player.solved,
       });
     });
-    this.onMessage("unlock", (client, message) => {
+    this.onMessage("unlock", () => {
       this.unlock();
     });
   }
 
-  onJoin(client: Client, options: any) {
+  onJoin(client: Client) {
     this.state.players.set(client.sessionId, new Player());
     console.log(client.sessionId, "joined!");
     this.broadcast("players", [...this.state.players.keys()]);
@@ -49,7 +49,8 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
         id: client.sessionId,
         solved: this.state.players.get(client.sessionId).solved,
       }); // update player score on clients
-    } catch (e) {
+    } catch {
+      // disconnect not recovered
     } finally {
       this.state.players.delete(client.sessionId);
       this.broadcast(
