@@ -12,6 +12,7 @@ import {
   DEFAULT_LANGUAGE,
   DEFAULT_LOCALE,
   DEFAULT_TIMEOUT,
+  RECONNECT_TIMEOUT_MS,
   WS_CLOSE_ERROR_CODES,
 } from "@/utils/constants";
 import { isEmpty, asyncWithTimeout } from "@/utils/helper";
@@ -51,6 +52,7 @@ const Game = () => {
   const inputRef = useRef<HTMLInputElement>(null);
   const promptRef = useRef<HTMLHeadingElement>(null);
   const roomRef = useRef<Colyseus.Room | null>(null);
+  const intentionalLeaveRef = useRef(false);
 
   const generatePrompt = (nextLocale: string) => {
     const num = Math.floor(Math.random() * 1000);
@@ -73,7 +75,7 @@ const Game = () => {
       }, 1000);
 
       setTimeout(() => {
-        gameRoom?.send("end");
+        roomRef.current?.send("end");
         clearInterval(id);
         setIsTiming(false);
         setSeconds(DEFAULT_TIMEOUT);
@@ -83,7 +85,7 @@ const Game = () => {
         setIsCompleted(true);
       }, DEFAULT_TIMEOUT * 1000);
 
-      gameRoom?.send("start");
+      roomRef.current?.send("start");
     }
   };
 
@@ -91,7 +93,7 @@ const Game = () => {
     if (e.key === "Enter") {
       const inputNumber = parseInt(inputRef.current!.value);
       if (inputNumber === number) {
-        gameRoom?.send("solve");
+        roomRef.current?.send("solve");
         inputRef.current!.value = "";
         incrementSolved();
         generatePrompt(locale);
@@ -109,20 +111,34 @@ const Game = () => {
     }
   };
 
+  const adoptRoom = (room: Colyseus.Room) => {
+    // Server-side state machine handles unlock; we run our own reconnection
+    // logic in onLeave, so silence the SDK's competing 15-retry loop.
+    room.reconnection.enabled = false;
+    roomRef.current = room;
+    setGameRoom(room);
+    setRoomCallbacks(room);
+  };
+
   const joinRoom = async () => {
     setCommunicating(true);
+    intentionalLeaveRef.current = false;
     try {
       const room = await CLIENT.joinOrCreate(locale);
-      roomRef.current = room;
-      setGameRoom(room);
+      adoptRoom(room);
       console.log(room.sessionId, "joined", room.name);
-      setRoomCallbacks(room);
     } catch (e) {
       console.error("JOIN ERROR", e);
       toast.error("Unable to connect. Please try again later.");
     } finally {
       setCommunicating(false);
     }
+  };
+
+  const tearDown = () => {
+    roomRef.current = null;
+    setGameRoom(null);
+    setPlayerScores({});
   };
 
   const setRoomCallbacks = (room: Colyseus.Room) => {
@@ -137,51 +153,57 @@ const Game = () => {
       }));
     });
     room.onMessage("final", (res: { id: string; solved: number }) => {
-      updateFinalScores((prev) => {
-        const next = { ...prev, [res.id]: res.solved };
-        if (Object.values(next).every((score) => score !== -1)) {
-          room.send("unlock");
-        }
-        return next;
-      });
+      // Server auto-unlocks when everyone is done — no need to send "unlock".
+      updateFinalScores((prev) => ({ ...prev, [res.id]: res.solved }));
+    });
+    room.onMessage("shutdown", () => {
+      // Graceful server shutdown: skip reconnect, tell user, clean up.
+      intentionalLeaveRef.current = true;
+      toast.info("Server is restarting. Please rejoin in a moment.");
     });
 
     room.onLeave(async (code: number) => {
       console.log(`${room.sessionId} left with code ${code}`);
+
+      if (intentionalLeaveRef.current) {
+        intentionalLeaveRef.current = false;
+        tearDown();
+        return;
+      }
+
       toast.info("Disconnected.");
-      // handle arbtrary disconnects
-      if (WS_CLOSE_ERROR_CODES.includes(code)) {
-        setCommunicating(true);
-        toast.info("Attempting to reconnect...");
-        try {
-          const newRoom = await asyncWithTimeout(
-            CLIENT.reconnect(room.reconnectionToken),
-            2500,
-          );
-          roomRef.current = newRoom;
-          setGameRoom(newRoom);
-          setRoomCallbacks(newRoom);
-          console.log(newRoom.sessionId, "rejoined", newRoom.name);
-          toast.success("Reconnected!");
-          setCommunicating(false);
-          return;
-        } catch (e) {
-          console.error("RECONNECT ERROR", e);
-          toast.error("Unable to reconnect.");
-        }
+      if (!WS_CLOSE_ERROR_CODES.includes(code)) {
+        tearDown();
+        return;
+      }
+
+      setCommunicating(true);
+      toast.info("Attempting to reconnect...");
+      try {
+        const newRoom = await asyncWithTimeout(
+          CLIENT.reconnect(room.reconnectionToken),
+          RECONNECT_TIMEOUT_MS,
+        );
+        adoptRoom(newRoom);
+        console.log(newRoom.sessionId, "rejoined", newRoom.name);
+        toast.success("Reconnected!");
+      } catch (e) {
+        console.error("RECONNECT ERROR", e);
+        toast.error("Unable to reconnect.");
+        tearDown();
+      } finally {
         setCommunicating(false);
       }
-      roomRef.current = null;
-      setGameRoom(null);
-      setPlayerScores({});
     });
+
     room.onError((code: number, message?: string) => {
       console.error(`error occurred with code ${code}:`, message);
     });
   };
 
   const leaveRoom = () => {
-    gameRoom?.leave(); // onLeave callback will be invoked
+    intentionalLeaveRef.current = true;
+    roomRef.current?.leave();
   };
 
   return (
