@@ -191,7 +191,11 @@ const Game = () => {
 
   const leaveRoom = () => {
     cleanExitRef.current = true;
-    roomRef.current?.leave();
+    if (roomRef.current) {
+      // Skip the SDK's reconnect path entirely on a user-initiated leave.
+      roomRef.current.reconnection.enabled = false;
+      roomRef.current.leave();
+    }
   };
 
   return (
