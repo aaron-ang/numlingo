@@ -1,18 +1,17 @@
 name: CI Client
 
 on:
+  # Every push to main runs this, even server-only changes: Vercel's
+  # production Deployment Check waits for the "client" job on each commit.
   push:
     branches: [main]
-    paths:
-      - "client/**"
-      - ".github/workflows/ci-client.yml"
   pull_request:
     paths:
       - "client/**"
       - ".github/workflows/ci-client.yml"
 
 jobs:
-  lint:
+  client:
     runs-on: ubuntu-latest
     defaults:
       run:
