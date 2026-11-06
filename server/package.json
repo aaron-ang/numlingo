@@ -30,7 +30,7 @@
     "typescript-eslint": "^8.59.2"
   },
   "dependencies": {
-    "@colyseus/bun-websockets": "^0.17.13",
+    "@colyseus/bun-websockets": "^0.18.0",
     "@colyseus/monitor": "^0.17.8",
     "@colyseus/playground": "^0.17.12",
     "@colyseus/tools": "^0.17.19",
