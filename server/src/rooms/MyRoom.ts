@@ -2,9 +2,27 @@ import { Room, Client, CloseCode } from "@colyseus/core";
 import { MyRoomState, Player } from "./schema/MyRoomState";
 
 const RECONNECTION_SECONDS = 60;
+const MAX_NAME_LENGTH = 16;
+
+const newSeed = () => Math.floor(Math.random() * 2 ** 32);
+
+// Strip control characters, collapse whitespace, cap length.
+export const sanitizeName = (raw: unknown): string =>
+  typeof raw === "string"
+    ? raw
+        .replace(/[\p{C}]/gu, "")
+        .replace(/\s+/g, " ")
+        .trim()
+        // Slice by code point so an emoji is never split into a lone surrogate.
+        .match(new RegExp(`^.{0,${MAX_NAME_LENGTH}}`, "su"))![0]
+        .trimEnd()
+    : "";
 
 export class MyRoom extends Room<{ state: MyRoomState }> {
   maxClients = 4;
+  // Every player in a round gets the same number sequence from this seed.
+  private seed = newSeed();
+  private joinCount = 0;
 
   onCreate(_options: { lang: string }) {
     this.state = new MyRoomState();
@@ -23,6 +41,7 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
       const player = this.state.players.get(client.sessionId);
       if (!player || player.status !== "idle") return;
       player.status = "playing";
+      this.broadcastPlayers();
       // Lock once anyone has started so new joiners can't slip into a live game.
       if (!this.locked) await this.lock();
     });
@@ -36,13 +55,17 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
         solved: player.solved,
       });
       await this.maybeReset();
+      this.broadcastPlayers();
     });
   }
 
-  onJoin(client: Client) {
-    this.state.players.set(client.sessionId, new Player());
+  onJoin(client: Client, options?: { name?: unknown }) {
+    const player = new Player();
+    player.name = sanitizeName(options?.name) || `Player ${++this.joinCount}`;
+    this.state.players.set(client.sessionId, player);
     console.log(client.sessionId, "joined!");
-    this.broadcast("players", [...this.state.players.keys()]);
+    client.send("round", { seed: this.seed });
+    this.broadcastPlayers();
   }
 
   async onLeave(client: Client, code?: number) {
@@ -80,14 +103,26 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
   private async removePlayer(sessionId: string) {
     if (!this.state.players.has(sessionId)) return;
     this.state.players.delete(sessionId);
-    this.broadcast("players", [...this.state.players.keys()]);
     await this.maybeReset();
+    this.broadcastPlayers();
+  }
+
+  private broadcastPlayers() {
+    this.broadcast(
+      "players",
+      [...this.state.players.entries()].map(([id, p]) => ({
+        id,
+        name: p.name,
+        status: p.status,
+      })),
+    );
   }
 
   // Reopen the room once no players are mid-game; reset everyone's status
-  // so the next round starts cleanly.
+  // and pick a fresh seed so the next round starts cleanly.
   private async maybeReset() {
     if (this.state.players.size === 0) {
+      this.seed = newSeed();
       if (this.locked) await this.unlock();
       return;
     }
@@ -95,10 +130,19 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
       (p) => p.status === "playing",
     );
     if (stillPlaying) return;
-    this.state.players.forEach((p) => {
-      p.status = "idle";
-      p.solved = 0;
-    });
+    // Only a finished round needs new numbers; if nobody got that far
+    // (e.g. the only active player left), idle players keep their sequence.
+    const roundFinished = [...this.state.players.values()].some(
+      (p) => p.status === "done",
+    );
+    if (roundFinished) {
+      this.state.players.forEach((p) => {
+        p.status = "idle";
+        p.solved = 0;
+      });
+      this.seed = newSeed();
+      this.broadcast("round", { seed: this.seed });
+    }
     if (this.locked) await this.unlock();
   }
 }

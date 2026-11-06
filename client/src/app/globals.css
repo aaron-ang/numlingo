@@ -1,36 +1,70 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg-color: #1c2026;
-  --color-sub-color: #353a44;
-  --color-text-muted: #9ca3af;
-  --color-accent: #ffc435;
-  --color-text-accent: #eeeeee;
+  --color-ink: #141b2b;
+  --color-slate: #1f2940;
+  --color-line: #2a3550;
+  --color-rule: #5b6884;
+  --color-paper: #ece6d6;
+  --color-muted: #9aa6bf;
+  --color-saffron: #f4b63f;
+  --color-coral: #f0735f;
+  --color-mint: #63d2a8;
+
+  --font-sans: var(--font-atkinson), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-literata), ui-serif, Georgia, serif;
+
+  --animate-miss: miss 360ms ease-out;
+  --animate-hit: hit 420ms ease-out;
+  --animate-caret: caret 1s steps(1) infinite;
+
+  @keyframes miss {
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    20% {
+      transform: translateX(-6px);
+    }
+    40% {
+      transform: translateX(5px);
+    }
+    60% {
+      transform: translateX(-3px);
+    }
+    80% {
+      transform: translateX(2px);
+    }
+  }
+  @keyframes hit {
+    0% {
+      transform: translateY(0);
+    }
+    35% {
+      transform: translateY(-4px);
+    }
+    100% {
+      transform: translateY(0);
+    }
+  }
+  @keyframes caret {
+    50% {
+      opacity: 0;
+    }
+  }
 }
 
 @layer base {
-  * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+  body {
+    @apply bg-ink text-paper font-sans antialiased;
   }
 
-  input[type="number"]::-webkit-outer-spin-button,
-  input[type="number"]::-webkit-inner-spin-button,
-  input[type="number"] {
-    -webkit-appearance: none;
-    appearance: none;
-    margin: 0;
-    -moz-appearance: textfield !important;
+  :focus-visible {
+    outline: 2px solid var(--color-saffron);
+    outline-offset: 3px;
   }
 
-  select {
-    -moz-appearance: none;
-    -webkit-appearance: none;
-    appearance: none;
-  }
-
-  select::-ms-expand {
-    display: none;
+  button {
+    cursor: pointer;
   }
 }

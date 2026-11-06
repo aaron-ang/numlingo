@@ -5,35 +5,45 @@ type LeaderboardProps = {
 };
 
 const Leaderboard = ({ final }: LeaderboardProps) => {
-  const { gameRoom, playerScores, finalScores } = useAppStore();
-  const scores = final ? finalScores : playerScores;
-  return (
-    gameRoom && (
-      <div className="mt-20 flex flex-col items-center text-xl text-text-accent">
-        <h1>Leaderboard</h1>
-
-        <ul>
-          {Object.entries(scores)
-            .sort((a, b) => b[1] - a[1])
-            .map(([id, score], index) => {
-              const strScore = score === -1 ? "???" : score;
-              return id === gameRoom.sessionId ? (
-                <li key={id} className="font-bold">
-                  {index + 1}. {id} (You): {strScore}
-                </li>
-              ) : (
-                <li key={id}>
-                  {index + 1}. {id}: {strScore}
-                </li>
-              );
-            })}
-        </ul>
-
-        <h1 className="mt-5 text-sm text-text-accent">
-          Room ID: {gameRoom.roomId}
-        </h1>
-      </div>
+  const { gameRoom, playerScores, finalScores, playerNames, playerStatus } =
+    useAppStore();
+  if (!gameRoom) return null;
+  // The final board lists players who finished or are still mid-round;
+  // anyone who never started this round has no result to show.
+  const ranked = Object.entries(final ? finalScores : playerScores)
+    .filter(
+      ([id, score]) =>
+        !final ||
+        score >= 0 ||
+        playerStatus[id] !== "idle" ||
+        id === gameRoom.sessionId,
     )
+    .sort((a, b) => b[1] - a[1]);
+
+  return (
+    <section className="w-full max-w-sm text-left" aria-label="Room scores">
+      <ol className="divide-line border-line divide-y border-y">
+        {ranked.map(([id, score], index) => {
+          const isYou = id === gameRoom.sessionId;
+          return (
+            <li
+              key={id}
+              className={`flex items-baseline gap-4 py-2.5 text-lg ${isYou ? "text-paper" : "text-muted"}`}
+            >
+              <span className="font-display w-5 tabular-nums">{index + 1}</span>
+              <span className="flex-1 truncate">
+                {playerNames[id] ?? id}
+                {isYou && <span className="text-muted"> (you)</span>}
+              </span>
+              <span className="font-display text-paper tabular-nums">
+                {score === -1 ? "still playing" : score}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+      <p className="text-muted mt-3 text-sm">Room {gameRoom.roomId}</p>
+    </section>
   );
 };
 

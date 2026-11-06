@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "vitest run"
   },
   "dependencies": {
     "@colyseus/sdk": "^0.17.42",
@@ -19,16 +20,22 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.4",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.8",
     "@types/node": "^25.6.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.2.1",
     "eslint": "^9",
     "eslint-config-next": "^16.2.4",
+    "jsdom": "^31.0.0",
     "postcss": "^8",
     "prettier": "^3.8.3",
     "prettier-plugin-tailwindcss": "^0.8.0",
     "tailwindcss": "^4.2.4",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^5.1.0"
   },
   "trustedDependencies": [
     "unrs-resolver"

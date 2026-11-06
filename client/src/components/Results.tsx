@@ -1,4 +1,3 @@
-import { isEmpty } from "@/utils/helper";
 import Leaderboard from "./Leaderboard";
 import { useAppStore } from "@/utils/store";
 
@@ -7,7 +6,9 @@ const Results = () => {
     solved,
     incorrect,
     attempted,
-    finalScores,
+    gameRoom,
+    playerNames,
+    playerStatus,
     resetSolved,
     resetIncorrect,
     setIsCompleted,
@@ -15,55 +16,86 @@ const Results = () => {
     setFinalScores,
   } = useAppStore();
 
+  const accuracy =
+    attempted > 0 ? `${Math.floor((solved / attempted) * 100)}%` : "–";
+  const missed = Object.entries(incorrect).sort(
+    (a, b) => b[1].count - a[1].count,
+  );
+
+  // The server only starts a new room round once nobody is mid-round.
+  const waiting =
+    gameRoom !== null &&
+    Object.entries(playerStatus).some(
+      ([id, status]) => id !== gameRoom.sessionId && status === "playing",
+    );
+
+  const playAgain = () => {
+    resetSolved();
+    resetAttempted();
+    resetIncorrect();
+    // Everyone still in the room starts the next round unfinished.
+    setFinalScores(
+      Object.fromEntries(Object.keys(playerNames).map((id) => [id, -1])),
+    );
+    setIsCompleted(false);
+  };
+
   return (
-    <>
-      <div className="mb-5 flex w-2/3 items-center justify-evenly">
+    <div className="flex w-full flex-col items-center gap-12">
+      <div className="grid w-full gap-10 text-center sm:grid-cols-2 sm:text-left">
         <div>
-          <h2 className="text-2xl text-text-accent">Accuracy:</h2>
-          <h1 className="text-7xl text-accent">
-            {Math.floor((solved / attempted) * 100)}%
-          </h1>
+          <p className="text-muted text-lg">Solved</p>
+          <p className="font-display text-saffron text-7xl font-semibold tabular-nums">
+            {solved}
+          </p>
+          <p className="text-muted mt-2 text-lg">
+            {attempted > 0
+              ? `${accuracy} accuracy over ${attempted} ${attempted === 1 ? "answer" : "answers"}`
+              : "No answers submitted"}
+          </p>
         </div>
 
         <div>
-          <h2 className="text-2xl text-text-accent">Missed Numbers:</h2>
-
-          <ol className="mt-2 w-full rounded border border-sub-color">
-            {isEmpty(incorrect) ? (
-              <li className="flex justify-between bg-bg-color px-5 py-3 text-xl text-text-accent">
-                <span>You didn&rsquo;t miss any numbers! 🎉</span>
-              </li>
-            ) : (
-              Object.entries(incorrect)
-                .sort((a, b) => b[1] - a[1])
-                .map(([key, value]) => (
-                  <li
-                    key={key}
-                    className="flex justify-between bg-bg-color px-5 py-3 text-xl text-text-accent"
-                  >
-                    <span>
-                      {key}: {value}
-                    </span>
-                  </li>
-                ))
-            )}
-          </ol>
+          <p className="text-muted text-lg">Missed numbers</p>
+          {missed.length === 0 ? (
+            <p className="text-paper mt-3 text-lg">
+              {attempted > 0
+                ? "None. Every answer was right."
+                : "Nothing to review yet."}
+            </p>
+          ) : (
+            <ul className="divide-line border-line mt-3 divide-y border-y text-left">
+              {missed.map(([prompt, { number, count }]) => (
+                <li
+                  key={prompt}
+                  className="text-paper flex items-baseline gap-4 py-2 text-lg"
+                >
+                  <span className="flex-1">{prompt}</span>
+                  {count > 1 && (
+                    <span className="text-coral tabular-nums">×{count}</span>
+                  )}
+                  <span className="font-display text-saffron w-[3ch] text-right text-xl tabular-nums">
+                    {number}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
-      {!isEmpty(finalScores) && <Leaderboard final />}
+
+      {gameRoom && <Leaderboard final />}
+
       <button
-        onClick={() => {
-          resetSolved();
-          resetAttempted();
-          resetIncorrect();
-          setFinalScores({});
-          setIsCompleted(false);
-        }}
-        className="mt-4 rounded border border-sub-color px-5 py-1 text-xl text-sub-color hover:border-text-accent hover:text-text-accent"
+        type="button"
+        onClick={playAgain}
+        disabled={waiting}
+        autoFocus
+        className="bg-saffron text-ink rounded-full px-6 py-2.5 text-lg font-semibold disabled:cursor-not-allowed disabled:opacity-50"
       >
-        Restart
+        {waiting ? "Waiting for others to finish…" : "Play again"}
       </button>
-    </>
+    </div>
   );
 };
 
