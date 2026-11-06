@@ -226,6 +226,37 @@ describe("prompts", () => {
 
     expect(prompt()).toBe(numToString(numberAt(SEED, 1), "en"));
     expect(room.send).toHaveBeenCalledWith("solve");
+    expect(document.activeElement).toBe(answerInput());
+  });
+
+  it("checks on a tap without moving focus, so the phone keyboard stays open", async () => {
+    await joinSeeded();
+    await userEvent.type(answerInput(), ANSWER);
+    const check = screen.getByRole("button", { name: "Check" });
+    vi.spyOn(check, "getBoundingClientRect").mockReturnValue(
+      DOMRect.fromRect({ x: 0, y: 0, width: 100, height: 80 }),
+    );
+    const touchEnd = fireEvent.touchEnd(check, {
+      changedTouches: [{ clientX: 50, clientY: 40 }],
+    });
+
+    expect(touchEnd).toBe(false);
+    expect(useAppStore.getState().solved).toBe(1);
+    expect(document.activeElement).toBe(answerInput());
+  });
+
+  it("ignores a touch that slides off the Check button", async () => {
+    await joinSeeded();
+    await userEvent.type(answerInput(), ANSWER);
+    const check = screen.getByRole("button", { name: "Check" });
+    vi.spyOn(check, "getBoundingClientRect").mockReturnValue(
+      DOMRect.fromRect({ x: 0, y: 0, width: 100, height: 80 }),
+    );
+    fireEvent.touchEnd(check, {
+      changedTouches: [{ clientX: 50, clientY: 300 }],
+    });
+
+    expect(useAppStore.getState().attempted).toBe(0);
   });
 
   it("ignores Enter with nothing typed", async () => {

@@ -178,6 +178,13 @@ const Game = () => {
     }
   };
 
+  // Focus goes back to the field even after a keyboard press on Check:
+  // the button disables once the answer clears, which would drop focus.
+  const check = () => {
+    if (answer) submit(answer);
+    inputRef.current?.focus();
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && answer) submit(answer);
   };
@@ -269,9 +276,19 @@ const Game = () => {
         {/* Phone number pads have no Enter key, so this stays visible. */}
         <button
           type="button"
-          // Keep focus in the field so the keyboard stays open.
-          onPointerDown={(e) => e.preventDefault()}
-          onClick={() => answer && submit(answer)}
+          // Keep focus in the field so the keyboard stays open. iOS moves
+          // focus on the mouse events it fires after a touch, so a tap is
+          // handled on touchend, which cancels them.
+          onMouseDown={(e) => e.preventDefault()}
+          onTouchEnd={(e) => {
+            // A finger that slid off the button is not a tap.
+            const { clientX: x, clientY: y } = e.changedTouches[0];
+            const r = e.currentTarget.getBoundingClientRect();
+            if (x < r.left || x > r.right || y < r.top || y > r.bottom) return;
+            e.preventDefault();
+            check();
+          }}
+          onClick={check}
           disabled={!answer}
           className="border-paper text-paper active:bg-paper active:text-ink inline-flex h-20 items-center rounded-xl border-2 px-5 text-lg font-semibold transition-colors disabled:opacity-40 sm:h-24"
         >
