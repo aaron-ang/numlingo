@@ -37,6 +37,12 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
       });
     });
 
+    // SDK 0.18 drops messages sent before the client registers handlers.
+    this.onMessage("sync", (client) => {
+      client.send("round", { seed: this.seed });
+      client.send("players", this.playerList());
+    });
+
     this.onMessage("start", async (client) => {
       const player = this.state.players.get(client.sessionId);
       if (!player || player.status !== "idle") return;
@@ -64,8 +70,7 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
     player.name = sanitizeName(options?.name) || `Player ${++this.joinCount}`;
     this.state.players.set(client.sessionId, player);
     console.log(client.sessionId, "joined!");
-    client.send("round", { seed: this.seed });
-    this.broadcastPlayers();
+    this.broadcast("players", this.playerList(), { except: client });
   }
 
   async onLeave(client: Client, code?: number) {
@@ -107,15 +112,16 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
     this.broadcastPlayers();
   }
 
+  private playerList() {
+    return [...this.state.players.entries()].map(([id, p]) => ({
+      id,
+      name: p.name,
+      status: p.status,
+    }));
+  }
+
   private broadcastPlayers() {
-    this.broadcast(
-      "players",
-      [...this.state.players.entries()].map(([id, p]) => ({
-        id,
-        name: p.name,
-        status: p.status,
-      })),
-    );
+    this.broadcast("players", this.playerList());
   }
 
   // Reopen the room once no players are mid-game; reset everyone's status

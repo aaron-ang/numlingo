@@ -93,6 +93,18 @@ describe("joining", () => {
     expect(localStorage.getItem("numlingo:name")).toBe("Ada");
   });
 
+  it("asks for the seed and player list once its handlers are registered", async () => {
+    render(<Game />);
+    const room = new FakeRoom("a");
+    let registered: string[] = [];
+    room.send.mockImplementation((type: string) => {
+      if (type === "sync") registered = Object.keys(room.messages);
+    });
+    await join(room);
+    expect(room.send).toHaveBeenCalledWith("sync");
+    expect(registered).toEqual(expect.arrayContaining(["players", "round"]));
+  });
+
   it("shows player names on the leaderboard", async () => {
     render(<Game />);
     const room = new FakeRoom("a");

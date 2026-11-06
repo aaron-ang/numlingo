@@ -9,8 +9,7 @@ import { MyRoomState } from "../src/rooms/schema/MyRoomState";
 
 type PlayerInfo = { id: string; name: string; status: string };
 
-// Joins broadcast "players" too, so an earlier list may still be in flight.
-// Resolve on the first broadcast matching `expected` (order-insensitive).
+// Resolve on the first "players" broadcast matching `expected`.
 function waitForPlayers(
   client: {
     onMessage: (type: string, cb: (msg: PlayerInfo[]) => void) => () => void;
@@ -59,15 +58,18 @@ describe("testing your Colyseus app", () => {
     const room = await colyseus.createRoom<MyRoomState>("en", {});
     const client1 = await colyseus.connectTo(room);
 
-    let client2Id = "";
-    const players = waitForPlayers(client1, () => [
-      client1.sessionId,
-      client2Id,
-    ]);
+    const players = new Promise<PlayerInfo[]>((resolve) => {
+      const off = client1.onMessage("players", (list: PlayerInfo[]) => {
+        if (list.length === 2) {
+          off();
+          resolve(list);
+        }
+      });
+    });
     const client2 = await colyseus.connectTo(room);
-    client2Id = client2.sessionId;
 
-    await players;
+    const ids = (await players).map((p) => p.id).sort();
+    assert.deepStrictEqual(ids, [client1.sessionId, client2.sessionId].sort());
   });
 
   it("uses the requested name, or a default", async () => {
@@ -75,11 +77,12 @@ describe("testing your Colyseus app", () => {
     const client1 = await colyseus.connectTo(room, { name: "  Ada \n L " });
     const client2 = await colyseus.connectTo(room);
 
-    const list = await waitForPlayers(client2, () => [
+    const list = waitForPlayers(client2, () => [
       client1.sessionId,
       client2.sessionId,
     ]);
-    const names = Object.fromEntries(list.map((p) => [p.id, p.name]));
+    client2.send("sync");
+    const names = Object.fromEntries((await list).map((p) => [p.id, p.name]));
     assert.strictEqual(names[client1.sessionId], "Ada L");
     assert.strictEqual(names[client2.sessionId], "Player 1");
   });
@@ -98,9 +101,11 @@ describe("testing your Colyseus app", () => {
   it("gives every player in a room the same seed", async () => {
     const room = await colyseus.createRoom<MyRoomState>("en", {});
     const client1 = await colyseus.connectTo(room);
-    const seed1 = client1.waitForMessage("round");
     const client2 = await colyseus.connectTo(room);
+    const seed1 = client1.waitForMessage("round");
     const seed2 = client2.waitForMessage("round");
+    client1.send("sync");
+    client2.send("sync");
 
     const [a, b] = await Promise.all([seed1, seed2]);
     assert.strictEqual(typeof a.seed, "number");
@@ -110,7 +115,9 @@ describe("testing your Colyseus app", () => {
   it("deals a new seed once a round finishes", async () => {
     const room = await colyseus.createRoom<MyRoomState>("en", {});
     const client1 = await colyseus.connectTo(room);
-    const first = await client1.waitForMessage("round");
+    const sync = client1.waitForMessage("round");
+    client1.send("sync");
+    const first = await sync;
 
     client1.send("start");
     await room.waitForMessage("start");

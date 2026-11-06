@@ -86,6 +86,7 @@ export const joinRoom = async (locale: string, name: string) => {
   const room = await CLIENT.joinOrCreate(locale, { name });
   current = room;
   attach(room);
+  room.send("sync");
   useAppStore.getState().setGameRoom(room);
   console.log(room.sessionId, "joined", room.name);
   return room;
