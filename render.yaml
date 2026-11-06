@@ -3,6 +3,7 @@ services:
     name: numlingo
     runtime: node
     plan: free
+    autoDeployTrigger: checksPass
     region: ohio
     rootDir: server
     buildCommand: bun install --frozen-lockfile
