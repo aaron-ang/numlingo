@@ -10,7 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@colyseus/sdk": "^0.17.42",
+    "@colyseus/sdk": "^0.18.0",
     "n2words": "^4.0.0",
     "next": "^16.2.4",
     "react": "^19.2.5",
