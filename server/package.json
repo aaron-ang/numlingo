@@ -32,7 +32,7 @@
   "dependencies": {
     "@colyseus/bun-websockets": "^0.18.0",
     "@colyseus/monitor": "^0.18.0",
-    "@colyseus/playground": "^0.17.12",
+    "@colyseus/playground": "^0.18.0",
     "@colyseus/tools": "^0.17.19",
     "colyseus": "^0.17.10",
     "express": "^5.2.1",
