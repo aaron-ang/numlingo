@@ -6,7 +6,8 @@ services:
     autoDeployTrigger: checksPass
     region: ohio
     rootDir: server
-    buildCommand: bun install --frozen-lockfile
+    # Cached node_modules can keep a stale @colyseus/core copy.
+    buildCommand: rm -rf node_modules && bun install --frozen-lockfile
     startCommand: bun run src/index.ts
     healthCheckPath: /hello_world
     envVars:
