@@ -219,6 +219,15 @@ describe("prompts", () => {
     expect((answerInput() as HTMLInputElement).value).toBe(ANSWER);
   });
 
+  it("submits with the Check button, for keypads without Enter", async () => {
+    const room = await joinSeeded();
+    await userEvent.type(answerInput(), ANSWER);
+    await userEvent.click(screen.getByRole("button", { name: "Check" }));
+
+    expect(prompt()).toBe(numToString(numberAt(SEED, 1), "en"));
+    expect(room.send).toHaveBeenCalledWith("solve");
+  });
+
   it("ignores Enter with nothing typed", async () => {
     render(<Game />);
     fireEvent.keyDown(answerInput(), { key: "Enter" });
@@ -283,7 +292,7 @@ describe("logo", () => {
 
     expect(useAppStore.getState().isCompleted).toBe(false);
     expect(useAppStore.getState().attempted).toBe(0);
-    expect(screen.getByText(/The clock starts when you type/)).toBeTruthy();
+    expect(screen.getByText(/clock starts when you type/)).toBeTruthy();
     expect((answerInput() as HTMLInputElement).value).toBe("");
   });
 
@@ -410,7 +419,7 @@ describe("leaving", () => {
     await userEvent.click(screen.getByText("Leave room"));
 
     expect(room.leave).toHaveBeenCalledOnce();
-    expect(screen.getByText(/The clock starts when you type/)).toBeTruthy();
+    expect(screen.getByText(/clock starts when you type/)).toBeTruthy();
     expect(screen.getByText("Quick match")).toBeTruthy();
   });
 

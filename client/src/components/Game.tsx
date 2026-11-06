@@ -257,14 +257,27 @@ const Game = () => {
         {prompt}
       </h1>
 
-      <AnswerField
-        ref={inputRef}
-        value={answer}
-        maxLength={MAX_DIGITS}
-        flash={flash}
-        onChange={handleInputChange}
-        onKeyDown={handleKeyDown}
-      />
+      <div className="flex items-center gap-3">
+        <AnswerField
+          ref={inputRef}
+          value={answer}
+          maxLength={MAX_DIGITS}
+          flash={flash}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
+        />
+        {/* Phone number pads have no Enter key, so this stays visible. */}
+        <button
+          type="button"
+          // Keep focus in the field so the keyboard stays open.
+          onPointerDown={(e) => e.preventDefault()}
+          onClick={() => answer && submit(answer)}
+          disabled={!answer}
+          className="border-paper text-paper active:bg-paper active:text-ink inline-flex h-20 items-center rounded-xl border-2 px-5 text-lg font-semibold transition-colors disabled:opacity-40 sm:h-24"
+        >
+          Check
+        </button>
+      </div>
 
       <div className="mt-8 flex w-full max-w-sm items-center gap-4">
         <div
@@ -291,7 +304,7 @@ const Game = () => {
             Solved <span className="text-mint">{solved}</span>
           </>
         ) : (
-          "Type the digits, then press Enter. The clock starts when you type."
+          "Type the digits, then press Enter or Check. The clock starts when you type."
         )}
       </p>
 

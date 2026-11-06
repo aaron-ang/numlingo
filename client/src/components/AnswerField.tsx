@@ -49,6 +49,7 @@ const AnswerField = ({
         ref={ref}
         type="text"
         inputMode="numeric"
+        enterKeyHint="done"
         pattern="[0-9]*"
         autoComplete="off"
         aria-label="Your answer in digits"
