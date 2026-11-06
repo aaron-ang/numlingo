@@ -1,10 +1,24 @@
-import { Room, Client, CloseCode } from "@colyseus/core";
+import { Room, Client, CloseCode, matchMaker } from "@colyseus/core";
 import { MyRoomState, Player } from "./schema/MyRoomState";
 
 const RECONNECTION_SECONDS = 60;
 const MAX_NAME_LENGTH = 16;
 
 const newSeed = () => Math.floor(Math.random() * 2 ** 32);
+
+// Short enough to read out loud; no 0/O, 1/I/L lookalikes.
+const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+const CODE_LENGTH = 5;
+const randomCode = () =>
+  Array.from(
+    { length: CODE_LENGTH },
+    () => CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)],
+  ).join("");
+export const newRoomCode = () => {
+  let code = randomCode();
+  while (matchMaker.getLocalRoomById(code)) code = randomCode();
+  return code;
+};
 
 // Strip control characters, collapse whitespace, cap length.
 export const sanitizeName = (raw: unknown): string =>
@@ -24,7 +38,11 @@ export class MyRoom extends Room<{ state: MyRoomState }> {
   private seed = newSeed();
   private joinCount = 0;
 
-  onCreate(_options: { lang: string }) {
+  // Every room gets a code friends can join with; private rooms are
+  // reachable only that way, never through quick match.
+  async onCreate(options: { lang: string; private?: boolean }) {
+    this.roomId = newRoomCode();
+    if (options.private) await this.setPrivate(true);
     this.state = new MyRoomState();
 
     this.onMessage("solve", (client) => {

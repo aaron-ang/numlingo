@@ -1,20 +1,12 @@
+import { useEffect, useEffectEvent } from "react";
+
 import Leaderboard from "./Leaderboard";
+import { onHome } from "@/utils/home";
 import { useAppStore } from "@/utils/store";
 
 const Results = () => {
-  const {
-    solved,
-    incorrect,
-    attempted,
-    gameRoom,
-    playerNames,
-    playerStatus,
-    resetSolved,
-    resetIncorrect,
-    setIsCompleted,
-    resetAttempted,
-    setFinalScores,
-  } = useAppStore();
+  const { solved, incorrect, attempted, gameRoom, playerStatus, resetGame } =
+    useAppStore();
 
   const accuracy =
     attempted > 0 ? `${Math.floor((solved / attempted) * 100)}%` : "–";
@@ -29,16 +21,11 @@ const Results = () => {
       ([id, status]) => id !== gameRoom.sessionId && status === "playing",
     );
 
-  const playAgain = () => {
-    resetSolved();
-    resetAttempted();
-    resetIncorrect();
-    // Everyone still in the room starts the next round unfinished.
-    setFinalScores(
-      Object.fromEntries(Object.keys(playerNames).map((id) => [id, -1])),
-    );
-    setIsCompleted(false);
-  };
+  // The logo means "Play again", and is just as blocked while others play.
+  const handleHome = useEffectEvent(() => {
+    if (!waiting) resetGame();
+  });
+  useEffect(() => onHome(() => handleHome()), []);
 
   return (
     <div className="flex w-full flex-col items-center gap-12">
@@ -88,7 +75,7 @@ const Results = () => {
 
       <button
         type="button"
-        onClick={playAgain}
+        onClick={resetGame}
         disabled={waiting}
         autoFocus
         className="bg-saffron text-ink rounded-full px-6 py-2.5 text-lg font-semibold disabled:cursor-not-allowed disabled:opacity-50"

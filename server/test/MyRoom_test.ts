@@ -188,6 +188,34 @@ describe("testing your Colyseus app", () => {
     await idle;
   });
 
+  it("gives each room a short code to join by", async () => {
+    const room = await colyseus.createRoom<MyRoomState>("en", {});
+    assert.match(room.roomId, /^[A-HJKMNP-Z2-9]{5}$/);
+
+    const client = await colyseus.sdk.joinById(room.roomId, { name: "Bo" });
+    assert.strictEqual(client.roomId, room.roomId);
+  });
+
+  it("keeps private rooms out of quick match", async () => {
+    const hidden = await colyseus.createRoom<MyRoomState>("en", {
+      private: true,
+    });
+
+    const quick = await colyseus.sdk.joinOrCreate("en", {});
+    assert.notStrictEqual(quick.roomId, hidden.roomId);
+    const byCode = await colyseus.sdk.joinById(hidden.roomId, {});
+    assert.strictEqual(byCode.roomId, hidden.roomId);
+  });
+
+  it("turns away code joins once a game has started", async () => {
+    const room = await colyseus.createRoom<MyRoomState>("en", {});
+    const client1 = await colyseus.connectTo(room);
+    client1.send("start");
+    await room.waitForMessage("start");
+
+    await assert.rejects(colyseus.sdk.joinById(room.roomId, {}), /locked/);
+  });
+
   it("locks the room when a game starts", async () => {
     const room = await colyseus.createRoom<MyRoomState>("en", {});
     const client1 = await colyseus.connectTo(room);

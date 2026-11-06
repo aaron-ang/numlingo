@@ -9,10 +9,11 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import Game from "@/components/Game";
+import Navbar from "@/components/Navbar";
 import Results from "@/components/Results";
 import { DEFAULT_TIMEOUT } from "@/utils/constants";
 import { numToString } from "@/utils/numberConverter";
-import { numberAt } from "@/utils/random";
+import { MAX_DIGITS, numberAt } from "@/utils/random";
 import { leaveRoom } from "@/utils/session";
 import { useAppStore } from "@/utils/store";
 
@@ -55,17 +56,28 @@ class FakeRoom {
   }
 }
 
-const { joinOrCreate } = vi.hoisted(() => ({ joinOrCreate: vi.fn() }));
-vi.mock("@/utils/multiplayer", () => ({ CLIENT: { joinOrCreate } }));
+const { joinOrCreate, create, joinById } = vi.hoisted(() => ({
+  joinOrCreate: vi.fn(),
+  create: vi.fn(),
+  joinById: vi.fn(),
+}));
+vi.mock("@/utils/multiplayer", () => ({
+  CLIENT: { joinOrCreate, create, joinById },
+}));
 
 const initialStore = useAppStore.getState();
 
 // Mirrors app/page.tsx without next/dynamic.
-const App = () => (useAppStore().isCompleted ? <Results /> : <Game />);
+const App = () => {
+  const { isCompleted, gameKey } = useAppStore();
+  return isCompleted ? <Results /> : <Game key={gameKey} />;
+};
 
 beforeEach(() => {
   useAppStore.setState(initialStore, true);
   joinOrCreate.mockReset();
+  create.mockReset();
+  joinById.mockReset();
   localStorage.clear();
 });
 afterEach(() => {
@@ -80,7 +92,7 @@ const prompt = () => screen.getByRole("heading", { level: 1 }).textContent;
 const join = async (room: FakeRoom, name = "") => {
   joinOrCreate.mockResolvedValueOnce(room);
   if (name) await userEvent.type(screen.getByLabelText("Your name"), name);
-  await userEvent.click(screen.getByText("Play with friends"));
+  await userEvent.click(screen.getByText("Quick match"));
   await screen.findByText("Leave room");
 };
 
@@ -120,35 +132,91 @@ describe("joining", () => {
   });
 });
 
-describe("prompts", () => {
-  it("follows the room's seed so every player sees the same numbers", async () => {
+describe("private rooms", () => {
+  it("creates a private room and shows its code", async () => {
     render(<Game />);
     const room = new FakeRoom("a");
-    await join(room);
-    room.emit("round", { seed: 123 });
+    room.roomId = "K7QPX";
+    create.mockResolvedValueOnce(room);
 
-    expect(prompt()).toBe(numToString(numberAt(123, 0), "en"));
+    await userEvent.click(screen.getByText("Create room"));
+    await screen.findByText("Leave room");
 
-    await userEvent.type(answerInput(), `${numberAt(123, 0)}{Enter}`);
-    expect(prompt()).toBe(numToString(numberAt(123, 1), "en"));
+    expect(create).toHaveBeenCalledWith("en", { name: "", private: true });
+    expect(screen.getByLabelText("Copy room code K7QPX")).toBeTruthy();
+  });
+
+  it("joins by code and switches to the room's language", async () => {
+    render(<Game />);
+    const room = new FakeRoom("a");
+    room.name = "fr";
+    joinById.mockResolvedValueOnce(room);
+
+    await userEvent.type(screen.getByLabelText("Room code"), "k7q-px");
+    await userEvent.click(screen.getByText("Join"));
+    await screen.findByText("Leave room");
+
+    expect(joinById).toHaveBeenCalledWith("K7QPX", { name: "" });
+    expect(useAppStore.getState().locale).toBe("fr");
+  });
+
+  it("says when a code matches no room", async () => {
+    render(<Game />);
+    joinById.mockRejectedValueOnce(new Error('room "ZZZZZ" not found'));
+
+    await userEvent.type(screen.getByLabelText("Room code"), "zzzzz");
+    await userEvent.click(screen.getByText("Join"));
+
+    expect(await screen.findByText("No room with code ZZZZZ.")).toBeTruthy();
+    expect(screen.getByText("Quick match")).toBeTruthy();
+  });
+
+  it("says when the room is mid-round", async () => {
+    render(<Game />);
+    joinById.mockRejectedValueOnce(new Error('room "K7QPX" is locked'));
+
+    await userEvent.type(screen.getByLabelText("Room code"), "K7QPX");
+    await userEvent.click(screen.getByText("Join"));
+
+    expect(
+      await screen.findByText(
+        "Room K7QPX is full or mid-round. Try again later.",
+      ),
+    ).toBeTruthy();
+  });
+});
+
+// A seed whose first number has three digits, so partial answers exist.
+const SEED = Array.from({ length: 1000 }, (_, i) => i).find(
+  (s) => numberAt(s, 0) >= 100,
+)!;
+const ANSWER = String(numberAt(SEED, 0));
+const WRONG = ANSWER.slice(0, -1) + ((Number(ANSWER.at(-1)) + 1) % 10);
+
+const joinSeeded = async () => {
+  render(<Game />);
+  const room = new FakeRoom("a");
+  await join(room);
+  room.emit("round", { seed: SEED });
+  return room;
+};
+
+describe("prompts", () => {
+  it("follows the room's seed so every player sees the same numbers", async () => {
+    const room = await joinSeeded();
+    expect(prompt()).toBe(numToString(numberAt(SEED, 0), "en"));
+
+    await userEvent.type(answerInput(), `${ANSWER}{Enter}`);
+    expect(prompt()).toBe(numToString(numberAt(SEED, 1), "en"));
     expect(room.send).toHaveBeenCalledWith("solve");
   });
 
-  it("records a wrong answer with its number and keeps the prompt", async () => {
-    render(<Game />);
-    const room = new FakeRoom("a");
-    await join(room);
-    room.emit("round", { seed: 9 });
-    const answer = numberAt(9, 0);
-    const before = prompt();
+  it("waits for Enter before checking", async () => {
+    await joinSeeded();
+    await userEvent.type(answerInput(), ANSWER);
 
-    await userEvent.type(answerInput(), `${(answer + 1) % 1000}{Enter}`);
-
-    expect(prompt()).toBe(before);
-    expect(useAppStore.getState().incorrect).toEqual({
-      [before!]: { number: answer, count: 1 },
-    });
-    expect(screen.getByTestId("answer-slots").dataset.flash).toBe("miss");
+    expect(useAppStore.getState().attempted).toBe(0);
+    expect((answerInput() as HTMLInputElement).value).toBe(ANSWER);
   });
 
   it("ignores Enter with nothing typed", async () => {
@@ -158,11 +226,112 @@ describe("prompts", () => {
     expect(useAppStore.getState().attempted).toBe(0);
   });
 
-  it("keeps only digits, up to three", async () => {
-    render(<Game />);
-    await userEvent.type(answerInput(), "1a2-34");
+  it("records a wrong answer with its number and keeps the prompt", async () => {
+    await joinSeeded();
+    const before = prompt();
 
-    expect((answerInput() as HTMLInputElement).value).toBe("123");
+    await userEvent.type(answerInput(), `${WRONG}{Enter}`);
+
+    expect(prompt()).toBe(before);
+    expect(useAppStore.getState().incorrect).toEqual({
+      [before!]: { number: Number(ANSWER), count: 1 },
+    });
+    expect(screen.getByTestId("answer-field").dataset.flash).toBe("miss");
+    expect((answerInput() as HTMLInputElement).value).toBe("");
+  });
+
+  it("drops the miss feedback once the player types again", async () => {
+    await joinSeeded();
+    await userEvent.type(answerInput(), `${WRONG}{Enter}`);
+    await userEvent.type(answerInput(), ANSWER[0]);
+
+    expect(screen.getByTestId("answer-field").dataset.flash).toBeUndefined();
+  });
+
+  it("caps the answer at the longest number's length", async () => {
+    render(<Game />);
+    await userEvent.type(answerInput(), "1".repeat(MAX_DIGITS + 1));
+
+    expect((answerInput() as HTMLInputElement).value).toBe(
+      "1".repeat(MAX_DIGITS),
+    );
+  });
+
+  it("ignores non-digits", async () => {
+    await joinSeeded();
+    await userEvent.type(answerInput(), "a-" + ANSWER[0] + "x");
+
+    expect((answerInput() as HTMLInputElement).value).toBe(ANSWER[0]);
+  });
+});
+
+describe("logo", () => {
+  const renderApp = () =>
+    render(
+      <>
+        <Navbar />
+        <App />
+      </>,
+    );
+  const logo = () => screen.getByText("Numlingo");
+
+  it("solo, abandons the round and starts fresh", async () => {
+    renderApp();
+    await userEvent.type(answerInput(), "1");
+
+    await userEvent.click(logo());
+
+    expect(useAppStore.getState().isCompleted).toBe(false);
+    expect(useAppStore.getState().attempted).toBe(0);
+    expect(screen.getByText(/The clock starts when you type/)).toBeTruthy();
+    expect((answerInput() as HTMLInputElement).value).toBe("");
+  });
+
+  it("in a room, finishes the shared round early", async () => {
+    renderApp();
+    const room = new FakeRoom("a");
+    await join(room);
+    room.emit("round", { seed: SEED });
+    await userEvent.type(answerInput(), `${ANSWER}{Enter}`);
+
+    await userEvent.click(logo());
+
+    expect(room.send).toHaveBeenLastCalledWith("end");
+    expect(useAppStore.getState().isCompleted).toBe(true);
+    expect(useAppStore.getState().gameRoom).toBe(room);
+  });
+
+  it("acts as Play again on the results screen", async () => {
+    renderApp();
+    act(() => useAppStore.setState({ isCompleted: true }));
+
+    await userEvent.click(logo());
+
+    expect(useAppStore.getState().isCompleted).toBe(false);
+  });
+
+  it("does nothing on the results screen while others still play", async () => {
+    renderApp();
+    const room = new FakeRoom("a");
+    await join(room);
+    room.emit("players", [
+      { id: "a", name: "A", status: "done" },
+      { id: "b", name: "B", status: "playing" },
+    ]);
+    act(() => useAppStore.setState({ isCompleted: true }));
+
+    await userEvent.click(logo());
+
+    expect(useAppStore.getState().isCompleted).toBe(true);
+  });
+
+  it("leaves a modified click to the browser", async () => {
+    renderApp();
+    act(() => useAppStore.setState({ isCompleted: true }));
+
+    fireEvent.click(logo(), { metaKey: true });
+
+    expect(useAppStore.getState().isCompleted).toBe(true);
   });
 });
 
@@ -194,7 +363,7 @@ describe("leaving", () => {
 
     expect(room.leave).toHaveBeenCalledOnce();
     expect(room.reconnection.enabled).toBe(false);
-    expect(screen.getByText("Play with friends")).toBeTruthy();
+    expect(screen.getByText("Quick match")).toBeTruthy();
     expect(useAppStore.getState().gameRoom).toBeNull();
     expect(useAppStore.getState().playerScores).toEqual({});
   });
@@ -228,7 +397,7 @@ describe("leaving", () => {
     act(() => room.leaveListeners.forEach((cb) => cb(4000)));
 
     expect(useAppStore.getState().gameRoom).toBeNull();
-    expect(screen.getByText("Play with friends")).toBeTruthy();
+    expect(screen.getByText("Quick match")).toBeTruthy();
   });
 
   it("can leave in the middle of a round", async () => {
@@ -242,7 +411,7 @@ describe("leaving", () => {
 
     expect(room.leave).toHaveBeenCalledOnce();
     expect(screen.getByText(/The clock starts when you type/)).toBeTruthy();
-    expect(screen.getByText("Play with friends")).toBeTruthy();
+    expect(screen.getByText("Quick match")).toBeTruthy();
   });
 
   it("still controls the room after the results screen", async () => {
@@ -251,7 +420,7 @@ describe("leaving", () => {
     const room = new FakeRoom("a");
     joinOrCreate.mockResolvedValueOnce(room);
     await act(async () => {
-      fireEvent.click(screen.getByText("Play with friends"));
+      fireEvent.click(screen.getByText("Quick match"));
     });
     fireEvent.change(answerInput(), { target: { value: "1" } });
     act(() => vi.advanceTimersByTime(DEFAULT_TIMEOUT * 1000));

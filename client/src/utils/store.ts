@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import * as Colyseus from "@colyseus/sdk";
+import { DEFAULT_LOCALE } from "./constants";
 
 /** Wrong answers this round, keyed by the prompt shown. */
 export type PlayerStatus = "idle" | "playing" | "done";
@@ -19,6 +20,11 @@ interface AppState {
   playerNames: { [id: string]: string };
   playerStatus: { [id: string]: PlayerStatus | undefined };
   seed: number | null;
+  /** Kept outside Game so remounting it doesn't reset the language. */
+  locale: string;
+  setLocale: (locale: string) => void;
+  /** Bumped to remount the game with a fresh round. */
+  gameKey: number;
   incrementSolved: () => void;
   resetSolved: () => void;
   incrementAttempted: () => void;
@@ -39,6 +45,7 @@ interface AppState {
   setPlayers: (players: PlayerInfo[]) => void;
   setSeed: (seed: number) => void;
   clearRoom: () => void;
+  resetGame: () => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -97,6 +104,23 @@ export const useAppStore = create<AppState>((set) => ({
 
   seed: null,
   setSeed: (seed) => set({ seed }),
+
+  locale: DEFAULT_LOCALE,
+  setLocale: (locale) => set({ locale }),
+
+  gameKey: 0,
+  // Everyone still in the room starts the next round unfinished.
+  resetGame: () =>
+    set((state) => ({
+      solved: 0,
+      attempted: 0,
+      incorrect: {},
+      isCompleted: false,
+      finalScores: Object.fromEntries(
+        Object.keys(state.playerNames).map((id) => [id, -1]),
+      ),
+      gameKey: state.gameKey + 1,
+    })),
 
   clearRoom: () =>
     set({

@@ -15,7 +15,7 @@
   --font-display: var(--font-literata), ui-serif, Georgia, serif;
 
   --animate-miss: miss 360ms ease-out;
-  --animate-hit: hit 420ms ease-out;
+  --animate-hit: hit 700ms ease-out;
   --animate-caret: caret 1s steps(1) infinite;
 
   @keyframes miss {
@@ -36,17 +36,13 @@
       transform: translateX(2px);
     }
   }
+  /* Only a start frame: fades from mint to whatever border the field has. */
   @keyframes hit {
-    0% {
-      transform: translateY(0);
-    }
-    35% {
-      transform: translateY(-4px);
-    }
-    100% {
-      transform: translateY(0);
+    from {
+      border-color: var(--color-mint);
     }
   }
+
   @keyframes caret {
     50% {
       opacity: 0;

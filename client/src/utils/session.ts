@@ -81,9 +81,19 @@ const attach = (room: Colyseus.Room) => {
   });
 };
 
-export const joinRoom = async (locale: string, name: string) => {
+export type JoinTarget =
+  | { mode: "quick"; locale: string }
+  | { mode: "create"; locale: string }
+  | { mode: "code"; code: string };
+
+export const joinRoom = async (target: JoinTarget, name: string) => {
   cleanExit = false;
-  const room = await CLIENT.joinOrCreate(locale, { name });
+  const room =
+    target.mode === "code"
+      ? await CLIENT.joinById(target.code, { name })
+      : target.mode === "create"
+        ? await CLIENT.create(target.locale, { name, private: true })
+        : await CLIENT.joinOrCreate(target.locale, { name });
   current = room;
   attach(room);
   room.send("sync");

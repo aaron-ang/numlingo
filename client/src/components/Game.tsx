@@ -4,15 +4,23 @@ import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-import AnswerSlots, { type Flash } from "./AnswerSlots";
+import AnswerField, { type Flash } from "./AnswerField";
 import LanguageMenu from "./LanguageMenu";
 import Leaderboard from "./Leaderboard";
+import RoomCode from "./RoomCode";
 import LoadingButton from "./LoadingButton";
-import { DEFAULT_LOCALE, DEFAULT_TIMEOUT } from "@/utils/constants";
+import { DEFAULT_TIMEOUT } from "@/utils/constants";
 import { languageName } from "@/utils/languages";
 import { numToString } from "@/utils/numberConverter";
+import { onHome } from "@/utils/home";
 import { MAX_DIGITS, numberAt, randomSeed } from "@/utils/random";
-import { joinRoom, leaveRoom, onRoomClosed, send } from "@/utils/session";
+import {
+  joinRoom,
+  leaveRoom,
+  onRoomClosed,
+  send,
+  type JoinTarget,
+} from "@/utils/session";
 import { useAppStore } from "@/utils/store";
 
 export const NAME_KEY = "numlingo:name";
@@ -20,11 +28,13 @@ const ROUND_MS = DEFAULT_TIMEOUT * 1000;
 const TICK_MS = 200;
 
 const Game = () => {
-  const [locale, setLocale] = useState(DEFAULT_LOCALE);
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
   const [name, setName] = useState(() => localStorage.getItem(NAME_KEY) ?? "");
+  const [code, setCode] = useState("");
 
   const {
+    locale,
+    setLocale,
     solved,
     seed,
     gameRoom,
@@ -38,6 +48,7 @@ const Game = () => {
     setCommunicating,
     setIsCompleted,
     updatePlayerScores,
+    resetGame,
   } = useAppStore();
 
   const [endAt, setEndAt] = useState<number | null>(null);
@@ -103,6 +114,14 @@ const Game = () => {
   });
   useEffect(() => onRoomClosed(() => handleRoomClosed()), []);
 
+  // The room shares this round with others, so finish it the way the timer
+  // would; solo, just start over.
+  const handleHome = useEffectEvent(() => {
+    if (isTiming && gameRoom) finishRound();
+    else resetGame();
+  });
+  useEffect(() => onHome(() => handleHome()), []);
+
   useEffect(() => {
     if (!languageMenuOpen) return;
     const handleClickOutside = (e: MouseEvent) => {
@@ -127,21 +146,8 @@ const Game = () => {
     inputRef.current?.focus();
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const digits = e.target.value.replace(/\D/g, "").slice(0, MAX_DIGITS);
-    setAnswer(digits);
-    if (!isTiming && digits) {
-      const start = Date.now();
-      setNow(start);
-      setEndAt(start + ROUND_MS);
-      setLanguageMenuOpen(false);
-      send("start");
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key !== "Enter" || !answer) return;
-    if (parseInt(answer, 10) === number) {
+  const submit = (value: string) => {
+    if (parseInt(value, 10) === number) {
       send("solve");
       incrementSolved();
       setSequence((s) => ({ ...s, index: s.index + 1 }));
@@ -157,15 +163,44 @@ const Game = () => {
     incrementAttempted();
   };
 
-  const handleJoin = async () => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const digits = e.target.value.replace(/\D/g, "").slice(0, MAX_DIGITS);
+    if (!digits && !answer) return;
+    // Last answer's feedback ends once the player types again.
+    setFlash(null);
+    setAnswer(digits);
+    if (!isTiming && digits) {
+      const start = Date.now();
+      setNow(start);
+      setEndAt(start + ROUND_MS);
+      setLanguageMenuOpen(false);
+      send("start");
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && answer) submit(answer);
+  };
+
+  const handleJoin = async (target: JoinTarget) => {
     const trimmed = name.trim();
     localStorage.setItem(NAME_KEY, trimmed);
     setCommunicating(true);
     try {
-      await joinRoom(locale, trimmed);
+      const room = await joinRoom(target, trimmed);
+      // A code can lead to a room in another language.
+      setLocale(room.name);
     } catch (e) {
       console.error("JOIN ERROR", e);
-      toast.error("Couldn't reach the game server. Try again in a minute.");
+      const message = e instanceof Error ? e.message : "";
+      // Colyseus also locks a room once it's full, so "locked" means either.
+      toast.error(
+        target.mode === "code" && message.includes("locked")
+          ? `Room ${target.code} is full or mid-round. Try again later.`
+          : target.mode === "code" && message.includes("not found")
+            ? `No room with code ${target.code}.`
+            : "Couldn't reach the game server. Try again in a minute.",
+      );
     } finally {
       setCommunicating(false);
       inputRef.current?.focus();
@@ -222,9 +257,10 @@ const Game = () => {
         {prompt}
       </h1>
 
-      <AnswerSlots
+      <AnswerField
         ref={inputRef}
         value={answer}
+        maxLength={MAX_DIGITS}
         flash={flash}
         onChange={handleInputChange}
         onKeyDown={handleKeyDown}
@@ -264,6 +300,7 @@ const Game = () => {
           <LoadingButton label="Joining room…" />
         ) : gameRoom ? (
           <>
+            <RoomCode code={gameRoom.roomId} />
             <Leaderboard final={false} />
             <button
               type="button"
@@ -274,32 +311,77 @@ const Game = () => {
             </button>
           </>
         ) : isTiming ? null : (
-          <form
-            className="flex flex-col items-center gap-3 sm:flex-row"
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleJoin();
-            }}
-          >
-            <label htmlFor="player-name" className="sr-only">
-              Your name
-            </label>
-            <input
-              id="player-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Your name"
-              maxLength={16}
-              autoComplete="nickname"
-              className="border-rule placeholder:text-muted text-paper w-48 rounded-full border bg-transparent px-4 py-2.5 text-lg"
-            />
-            <button
-              type="submit"
-              className="border-paper text-paper hover:bg-paper hover:text-ink rounded-full border px-5 py-2.5 text-lg font-semibold transition-colors"
+          <div className="flex flex-col items-center gap-6">
+            <form
+              className="flex flex-col items-center gap-3 sm:flex-row"
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleJoin({ mode: "quick", locale });
+              }}
             >
-              Play with friends
-            </button>
-          </form>
+              <label htmlFor="player-name" className="sr-only">
+                Your name
+              </label>
+              <input
+                id="player-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Your name"
+                maxLength={16}
+                autoComplete="nickname"
+                className="border-rule placeholder:text-muted text-paper w-48 rounded-full border bg-transparent px-4 py-2.5 text-lg"
+              />
+              <button
+                type="submit"
+                className="border-paper text-paper hover:bg-paper hover:text-ink rounded-full border px-5 py-2.5 text-lg font-semibold transition-colors"
+              >
+                Quick match
+              </button>
+              <button
+                type="button"
+                onClick={() => handleJoin({ mode: "create", locale })}
+                className="text-paper hover:border-paper border-rule rounded-full border px-5 py-2.5 text-lg transition-colors"
+              >
+                Create room
+              </button>
+            </form>
+            <form
+              className="flex items-center gap-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (code) handleJoin({ mode: "code", code });
+              }}
+            >
+              <label htmlFor="room-code" className="sr-only">
+                Room code
+              </label>
+              <input
+                id="room-code"
+                value={code}
+                onChange={(e) =>
+                  setCode(
+                    // Codes never use 0, O, 1, I or L.
+                    e.target.value
+                      .toUpperCase()
+                      .replace(/[^A-HJ-KM-NP-Z2-9]/g, ""),
+                  )
+                }
+                placeholder="Room code"
+                maxLength={5}
+                autoComplete="off"
+                autoCapitalize="characters"
+                spellCheck={false}
+                className="border-rule placeholder:text-muted text-paper w-36 rounded-full border bg-transparent px-4 py-2.5 text-center text-lg tracking-[0.2em] uppercase placeholder:tracking-normal"
+              />
+              <button
+                type="submit"
+                disabled={!code}
+                className="text-muted hover:text-paper rounded-full px-4 py-2.5 text-lg underline-offset-4 hover:underline disabled:opacity-50 disabled:hover:no-underline"
+              >
+                Join
+              </button>
+            </form>
+          </div>
         )}
       </div>
 
