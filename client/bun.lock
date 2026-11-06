@@ -6,7 +6,7 @@
       "name": "num-sage",
       "dependencies": {
         "@colyseus/sdk": "^0.17.42",
-        "n2words": "^4.0.0",
+        "n2words": "^6.0.0",
         "next": "^16.2.4",
         "react": "^19.2.5",
         "react-dom": "^19.2.5",
@@ -794,7 +794,7 @@
 
     "msgpackr-extract": ["msgpackr-extract@3.0.3", "", { "dependencies": { "node-gyp-build-optional-packages": "5.2.2" }, "optionalDependencies": { "@msgpackr-extract/msgpackr-extract-darwin-arm64": "3.0.3", "@msgpackr-extract/msgpackr-extract-darwin-x64": "3.0.3", "@msgpackr-extract/msgpackr-extract-linux-arm": "3.0.3", "@msgpackr-extract/msgpackr-extract-linux-arm64": "3.0.3", "@msgpackr-extract/msgpackr-extract-linux-x64": "3.0.3", "@msgpackr-extract/msgpackr-extract-win32-x64": "3.0.3" }, "bin": { "download-msgpackr-prebuilds": "bin/download-prebuilds.js" } }, "sha512-P0efT1C9jIdVRefqjzOQ9Xml57zpOXnIuS+csaB4MdZbTdmGDLo8XhzBG1N7aO11gKDDkJvBLULeFTo46wwreA=="],
 
-    "n2words": ["n2words@4.0.0", "", {}, "sha512-y0TJuqz5IaDYAjhmiqKGM4C20/fNeOuPGIE+AM5v5mMO9G/lYJ9tee45NYR7lwF9bquwP6WW6YVxh3XTwq4xPg=="],
+    "n2words": ["n2words@6.3.0", "", { "bin": { "n2words": "bin/n2words.js" } }, "sha512-6eOJg5WTtB2D3Z9nWze2arXXVVHGicPsMZKJfS000SRucvCvGEaMHj+uBqzZfwqSPLmO2KtQ/iiEgMsk5bu2dw=="],
 
     "nanoid": ["nanoid@3.3.12", "", { "bin": { "nanoid": "bin/nanoid.cjs" } }, "sha512-ZB9RH/39qpq5Vu6Y+NmUaFhQR6pp+M2Xt76XBnEwDaGcVAqhlvxrl3B2bKS5D3NH3QR76v3aSrKaF/Kiy7lEtQ=="],
 
